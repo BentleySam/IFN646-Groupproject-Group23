@@ -67,7 +67,7 @@ We start off by importing packages (tidyverse, limma, edgeR etc), and load in th
 
 ## Data 
 
-After loading the data we're starting with ~60,000 genes, across the six samples. 
+After loading the data we're starting with **`r nrow(df)` genes** across **`r ncol(cts)` samples**. 
 
 The treatments/condition outline the different categories, with subject indicating the donor (experiment) each with replicates. Time and run are not used in the design, as they are confounded with treatment.
 
@@ -102,7 +102,7 @@ colnames(design)
 
 To reduce multiple-testing issues, and increase power, we drop uninformative rows and non-protein-coding genes. This is done by leveraging edgeR's filterByExpr function, which keeps genes with enough counts given the design/groups.
 
-The effect of this is dropping the gene count from ~60,000 to ~15,000, which is a more manageable number for DE analysis.
+The effect of this is dropping the gene count from ~60,000 to **`r nrow(cts)` genes**, which is a more manageable number for DE analysis.
 
 ## Design Notes
 
@@ -203,20 +203,20 @@ We can also use the second DE tool, edgeR, to provide an independent check on th
 
 ## DESeq2
 
-## EdgeR
+## edgeR
 
-EdgeR is another widely used tool for differential expression analysis for RNA data. It models the count data directly against a negative binomial distribution, a natural fit for RNA's dispersed seq counts. It estimates the common, trended and tagwise distributions and only then fits the GLM (Generalised Linear Model) to test for the DE.
+edgeR is another widely used tool for differential expression analysis for RNA data. It models the count data directly against a negative binomial distribution, a natural fit for RNA's dispersed seq counts. It estimates the common, trended and tagwise distributions and only then fits the GLM (Generalised Linear Model) to test for the DE.
 
-In this instance we also use the glmQLFit to implement treast-style testing with a minimum log-fold threshold.
+In this instance we also use the glmQLFit to implement treat-style testing with a minimum log-fold threshold.
 
 ### Benefits
 
 - Negative Binomial works well with small sample sizes (good in this instance)
 - Robust dispersion estimates can handle the outliers reliably.
-- GLM's accomodate complex contrasts, covariates and paired designs (useful in this case)
-- Also allows for the treat-style tests, letting us check against the minimum meaningul log fold change.
+- GLM's accommodate complex contrasts, covariates and paired designs (useful in this case)
+- Also allows for the treat-style tests, letting us check against the minimum meaningful log fold change.
 
-### Limmitations
+### Limitations
 
 - It does rely on the NB being a good fit. If there are extreme outliers, or an otherwise distorted distribution, this will challenge it.
 - While its possible to handle continous data, it requires a chunk of work. Given counts as our base data, we can somewhat handle this.
@@ -226,7 +226,7 @@ In this instance we also use the glmQLFit to implement treast-style testing with
 
 With our dataset only having the effective 2 samples per group, edgeR is generally more reliable, but will still have issues without more replicates. If the variance isn't controlled confidently, it will miss true signals. 
 
-``` {r edger-treat, echo=FALSE}
+``` {r edgeR-treat, echo=FALSE}
 dge <- edgeR::DGEList(cts) |> edgeR::calcNormFactors("TMM")
 dge <- edgeR::estimateDisp(dge, design, robust=TRUE)
 qlf <- edgeR::glmQLFit(dge, design, robust=TRUE)
@@ -249,7 +249,7 @@ sum_edgeR_strict <- sum(edgeR_res$FDR_edgeR < 0.05 & abs(edgeR_res$logFC_edgeR) 
 sum_edgeR_strict
 ```
 
-EdgeR finds four significant genes at 5% FDR and 2x fold-change, which is a modest improvement over limma voom but still limited by the sample size.
+edgeR finds four significant genes at 5% FDR and 2x fold-change, which is a modest improvement over limma voom but still limited by the sample size.
 
 
 ### Interpretation
@@ -441,11 +441,73 @@ cat(sprintf("BH critical ranks — Fisher: q=0.05→%d, q=0.10→%d; discoveries
             paste(names(bh_fisher$n_discoveries), bh_fisher$n_discoveries, collapse=", ")))
 ```
 
+# Conclusions (Per Rubric)
+
+The above analysis is summarised here:
+
+## Tool Selection & Rationale
+
+We apply two complementary DE tools:
+
+- **edgeR (NB-GLM + EB dispersion):** best aligned to small-n RNA-seq; robust to over-dispersion and donor heterogeneity; supports blocking by subject.
+*Configuration:* edgeR uses TMM normalisation, QL fit, and `glmTreat` with log2FC ≥ 1.  
 
 
-## Export Results (for Re-Use in later tasks)
+- **limma-voom (logCPM + precision weights + EB):** fast linear modelling with flexible contrasts; we include subject as a blocking factor and use `voomWithQualityWeights` to down-weight noisy samples.
+*Configuration:* limma-voom uses `voomWithQualityWeights`, `lmFit` + `eBayes`, and `topTreat` with log2FC ≥ 1.
 
-With the results confirmed, we can export the relevant tables for use in later tasks. 
+Given **n=2 per group**, edgeR is expected to be more reliable; limma-voom is included as a cross-method check. Genes are filtered with `filterByExpr` under the final design to retain adequately expressed features. We test **SARS vs mock** while retaining REM to help stabilise subject effects.
+
+
+### edgeR — Key results
+```{r}
+dir_edgeR <- if (mean(edgeR_res$logFC_edgeR[edgeR_res$FDR_edgeR < 0.05 & abs(edgeR_res$logFC_edgeR) >= 1]) > 0) "up" else "down"
+```
+- Significant (FDR < 0.05, |log2FC| ≥ 1): **`r sum_edgeR_strict`** genes.
+- Direction: majority **`r dir_edgeR`** in SARS. in SARS (see table below).
+*Interpretation:* Signals exist despite n=2; variance shrinkage helps but overall power is limited by donor heterogeneity.
+
+```{r edgeR_results, echo=FALSE}
+head(edgeR_res[order(edgeR_res$FDR_edgeR), ], 5)
+```
+
+### limma-voom — Key results
+- Significant (FDR < 0.05, |log2FC| ≥ 1): **`r sum_limma_strict`** genes (none).
+*Interpretation:* With n=2 and heterogeneous donors, the mean–variance trend and precision weights are insufficient for strict discovery; useful as a corroborative method.
+
+```{r Limma_results, echo=FALSE}
+head(tt_limma[order(tt_limma$FDR_limma), ], 5)
+```
+
+### Consensus method (combining tools)
+We form a conservative consensus by:
+1) Keeping genes present in both results with **consistent effect direction**.  
+2) Combining p-values via **Fisher’s method** (independent evidence assumption across methods is imperfect but common in practice).  
+3) Controlling FDR on combined p using BH.  
+4) Requiring **minimum effect size** (≥ 1.5×, log2FC ≥ 0.58) for biological relevance.  
+5) Adding a light **per-donor guard** (|per-donor log2FC| ≥ 0.3) to avoid single-sample artefacts.
+
+*Justification:* The tools exploit different modelling assumptions (NB vs weighted log-normal). Agreement plus effect-size and donor guards improves specificity when n is very small, trading sensitivity for plausibility.
+
+### Consensus — Key findings
+- **Strict consensus** (both FDR < 0.05, |mean log2FC| ≥ 1): **`r nrow(short_strict)`** genes.
+- **Relaxed consensus** (Fisher FDR < 0.10, |mean log2FC| ≥ 0.58, same direction, per-donor guard): **`r nrow(short_relaxed)`** genes.
+- **LOO robustness:** **`r length(robust_hits)`** relaxed genes persist when the noisiest sample is dropped.
+
+*Interpretation:* The relaxed consensus yields a focused list under severe n=2 constraints. These are **candidates**, not definitive discoveries; they prioritise follow-up (e.g., CRISPRi/a in Task 2).
+
+``` {r consensus-results, echo=FALSE}
+short_relaxed %>%
+  select(gene_name, gene, mean_logFC, FDR_fisher, CRISPR_action) %>%
+  arrange(FDR_fisher) %>%
+  head(10)
+```
+
+**Limitations:** n=2 per group severely constrains power; donor heterogeneity is high; independence for Fisher is an approximation; results should be validated with additional replicates.
+
+
+We export both per-tool and consensus tables and carry the **relaxed consensus top genes** forward as targets for Task 2 intervention design.
+
 
 ```{r export-results, echo=FALSE}
 readr::write_csv(tt_limma,      "DE_limma_treat_SARS_vs_mock.csv")
@@ -453,5 +515,7 @@ readr::write_csv(edgeR_res,     "DE_edgeR_treat_SARS_vs_mock.csv")
 readr::write_csv(consensus,     "DE_consensus_limmaTreat_edgeR_treat.csv")
 readr::write_csv(short_strict,  "CRISPR_target_shortlist_STRICT.csv")
 readr::write_csv(short_relaxed, "CRISPR_target_shortlist_RELAXED_perDonor.csv")
+cat("\n\nSession info:\n")
+sessionInfo()
 ```
 

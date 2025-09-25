@@ -380,8 +380,8 @@ we create the counts matrix and sample metadata as separate objects.
 That makes it easier to work with in later steps.</p>
 <div id="data" class="section level2">
 <h2>Data</h2>
-<p>After loading the data we’re starting with ~60,000 genes, across the
-six samples.</p>
+<p>After loading the data we’re starting with <strong>60683
+genes</strong> across <strong>6 samples</strong>.</p>
 <p>The treatments/condition outline the different categories, with
 subject indicating the donor (experiment) each with replicates. Time and
 run are not used in the design, as they are confounded with
@@ -404,7 +404,8 @@ uninformative rows and non-protein-coding genes. This is done by
 leveraging edgeR’s filterByExpr function, which keeps genes with enough
 counts given the design/groups.</p>
 <p>The effect of this is dropping the gene count from ~60,000 to
-~15,000, which is a more manageable number for DE analysis.</p>
+<strong>13375 genes</strong>, which is a more manageable number for DE
+analysis.</p>
 </div>
 <div id="design-notes" class="section level2">
 <h2>Design Notes</h2>
@@ -502,14 +503,14 @@ criteria in either method alone.</p>
 <h2>DESeq2</h2>
 </div>
 <div id="edger" class="section level2">
-<h2>EdgeR</h2>
-<p>EdgeR is another widely used tool for differential expression
+<h2>edgeR</h2>
+<p>edgeR is another widely used tool for differential expression
 analysis for RNA data. It models the count data directly against a
 negative binomial distribution, a natural fit for RNA’s dispersed seq
 counts. It estimates the common, trended and tagwise distributions and
 only then fits the GLM (Generalised Linear Model) to test for the
 DE.</p>
-<p>In this instance we also use the glmQLFit to implement treast-style
+<p>In this instance we also use the glmQLFit to implement treat-style
 testing with a minimum log-fold threshold.</p>
 <div id="benefits-1" class="section level3">
 <h3>Benefits</h3>
@@ -517,14 +518,14 @@ testing with a minimum log-fold threshold.</p>
 <li>Negative Binomial works well with small sample sizes (good in this
 instance)</li>
 <li>Robust dispersion estimates can handle the outliers reliably.</li>
-<li>GLM’s accomodate complex contrasts, covariates and paired designs
+<li>GLM’s accommodate complex contrasts, covariates and paired designs
 (useful in this case)</li>
 <li>Also allows for the treat-style tests, letting us check against the
-minimum meaningul log fold change.</li>
+minimum meaningful log fold change.</li>
 </ul>
 </div>
-<div id="limmitations" class="section level3">
-<h3>Limmitations</h3>
+<div id="limitations-1" class="section level3">
+<h3>Limitations</h3>
 <ul>
 <li>It does rely on the NB being a good fit. If there are extreme
 outliers, or an otherwise distorted distribution, this will challenge
@@ -546,7 +547,7 @@ true signals.</p>
 <div id="results-1" class="section level3">
 <h3>Results</h3>
 <pre><code>## [1] 4</code></pre>
-<p>EdgeR finds four significant genes at 5% FDR and 2x fold-change,
+<p>edgeR finds four significant genes at 5% FDR and 2x fold-change,
 which is a modest improvement over limma voom but still limited by the
 sample size.</p>
 </div>
@@ -705,10 +706,153 @@ and we can trust them.</p>
 <pre><code>## BH critical ranks — Fisher: q=0.05→15, q=0.10→25; discoveries via p.adjust: adj&lt;05 15, adj&lt;10 25</code></pre>
 </div>
 </div>
-<div id="export-results-for-re-use-in-later-tasks" class="section level2">
-<h2>Export Results (for Re-Use in later tasks)</h2>
-<p>With the results confirmed, we can export the relevant tables for use
-in later tasks.</p>
+</div>
+<div id="conclusions-per-rubric" class="section level1">
+<h1>Conclusions (Per Rubric)</h1>
+<p>The above analysis is summarised here:</p>
+<div id="tool-selection-rationale" class="section level2">
+<h2>Tool Selection &amp; Rationale</h2>
+<p>We apply two complementary DE tools:</p>
+<ul>
+<li><p><strong>edgeR (NB-GLM + EB dispersion):</strong> best aligned to
+small-n RNA-seq; robust to over-dispersion and donor heterogeneity;
+supports blocking by subject. <em>Configuration:</em> edgeR uses TMM
+normalisation, QL fit, and <code>glmTreat</code> with log2FC ≥
+1.</p></li>
+<li><p><strong>limma-voom (logCPM + precision weights + EB):</strong>
+fast linear modelling with flexible contrasts; we include subject as a
+blocking factor and use <code>voomWithQualityWeights</code> to
+down-weight noisy samples. <em>Configuration:</em> limma-voom uses
+<code>voomWithQualityWeights</code>, <code>lmFit</code> +
+<code>eBayes</code>, and <code>topTreat</code> with log2FC ≥ 1.</p></li>
+</ul>
+<p>Given <strong>n=2 per group</strong>, edgeR is expected to be more
+reliable; limma-voom is included as a cross-method check. Genes are
+filtered with <code>filterByExpr</code> under the final design to retain
+adequately expressed features. We test <strong>SARS vs mock</strong>
+while retaining REM to help stabilise subject effects.</p>
+<div id="edger-key-results" class="section level3">
+<h3>edgeR — Key results</h3>
+<pre class="r"><code>dir_edgeR &lt;- if (mean(edgeR_res$logFC_edgeR[edgeR_res$FDR_edgeR &lt; 0.05 &amp; abs(edgeR_res$logFC_edgeR) &gt;= 1]) &gt; 0) &quot;up&quot; else &quot;down&quot;</code></pre>
+<ul>
+<li>Significant (FDR &lt; 0.05, |log2FC| ≥ 1): <strong>4</strong>
+genes.</li>
+<li>Direction: majority <strong>up</strong> in SARS. in SARS (see table
+below). <em>Interpretation:</em> Signals exist despite n=2; variance
+shrinkage helps but overall power is limited by donor
+heterogeneity.</li>
+</ul>
+<pre><code>##              gene logFC_edgeR      p_edgeR    FDR_edgeR
+## 1 ENSG00000169245    8.355664 1.290094e-08 0.0001725501
+## 2 ENSG00000169248    6.903596 1.273797e-07 0.0008518516
+## 3 ENSG00000111335   10.969933 2.408210e-06 0.0107366049
+## 4 ENSG00000165949    4.290016 4.429500e-06 0.0148111403
+## 5 ENSG00000183486    4.514855 2.759295e-05 0.0738111536</code></pre>
+</div>
+<div id="limma-voom-key-results" class="section level3">
+<h3>limma-voom — Key results</h3>
+<ul>
+<li>Significant (FDR &lt; 0.05, |log2FC| ≥ 1): <strong>0</strong> genes
+(none). <em>Interpretation:</em> With n=2 and heterogeneous donors, the
+mean–variance trend and precision weights are insufficient for strict
+discovery; useful as a corroborative method.</li>
+</ul>
+<pre><code>##              gene logFC_limma      p_limma FDR_limma
+## 1 ENSG00000165949    4.614557 0.0003199601  0.834224
+## 2 ENSG00000266412   -1.312534 0.0003890705  0.834224
+## 3 ENSG00000197632   -1.804365 0.0004321308  0.834224
+## 4 ENSG00000138674   -1.148254 0.0010454769  0.834224
+## 5 ENSG00000068079    1.940231 0.0013875208  0.834224</code></pre>
+</div>
+<div id="consensus-method-combining-tools" class="section level3">
+<h3>Consensus method (combining tools)</h3>
+<p>We form a conservative consensus by: 1) Keeping genes present in both
+results with <strong>consistent effect direction</strong>.<br />
+2) Combining p-values via <strong>Fisher’s method</strong> (independent
+evidence assumption across methods is imperfect but common in
+practice).<br />
+3) Controlling FDR on combined p using BH.<br />
+4) Requiring <strong>minimum effect size</strong> (≥ 1.5×, log2FC ≥
+0.58) for biological relevance.<br />
+5) Adding a light <strong>per-donor guard</strong> (|per-donor log2FC| ≥
+0.3) to avoid single-sample artefacts.</p>
+<p><em>Justification:</em> The tools exploit different modelling
+assumptions (NB vs weighted log-normal). Agreement plus effect-size and
+donor guards improves specificity when n is very small, trading
+sensitivity for plausibility.</p>
+</div>
+<div id="consensus-key-findings" class="section level3">
+<h3>Consensus — Key findings</h3>
+<ul>
+<li><strong>Strict consensus</strong> (both FDR &lt; 0.05, |mean log2FC|
+≥ 1): <strong>0</strong> genes.</li>
+<li><strong>Relaxed consensus</strong> (Fisher FDR &lt; 0.10, |mean
+log2FC| ≥ 0.58, same direction, per-donor guard): <strong>25</strong>
+genes.</li>
+<li><strong>LOO robustness:</strong> <strong>25</strong> relaxed genes
+persist when the noisiest sample is dropped.</li>
+</ul>
+<p><em>Interpretation:</em> The relaxed consensus yields a focused list
+under severe n=2 constraints. These are <strong>candidates</strong>, not
+definitive discoveries; they prioritise follow-up (e.g., CRISPRi/a in
+Task 2).</p>
+<pre><code>##    gene_name            gene mean_logFC   FDR_fisher     CRISPR_action
+## 1     CXCL10 ENSG00000169245   8.015160 2.744205e-06 CRISPRi (repress)
+## 2     CXCL11 ENSG00000169248   6.775070 1.847932e-05 CRISPRi (repress)
+## 3      IFI27 ENSG00000165949   4.452287 4.285499e-05 CRISPRi (repress)
+## 4       OAS2 ENSG00000111335  10.157721 3.056561e-04 CRISPRi (repress)
+## 5        MX2 ENSG00000183486   4.438487 1.030924e-03 CRISPRi (repress)
+## 6     IFITM1 ENSG00000185885   2.203225 7.904258e-03 CRISPRi (repress)
+## 7     IFI44L ENSG00000137959   3.996990 7.983990e-03 CRISPRi (repress)
+## 8       BST2 ENSG00000130303   2.525724 7.983990e-03 CRISPRi (repress)
+## 9      IFI35 ENSG00000068079   1.935875 1.331103e-02 CRISPRi (repress)
+## 10     USP18 ENSG00000184979   3.555189 1.331103e-02 CRISPRi (repress)</code></pre>
+<p><strong>Limitations:</strong> n=2 per group severely constrains
+power; donor heterogeneity is high; independence for Fisher is an
+approximation; results should be validated with additional
+replicates.</p>
+<p>We export both per-tool and consensus tables and carry the
+<strong>relaxed consensus top genes</strong> forward as targets for Task
+2 intervention design.</p>
+<pre><code>## 
+## 
+## Session info:</code></pre>
+<pre><code>## R version 4.5.1 (2025-06-13 ucrt)
+## Platform: x86_64-w64-mingw32/x64
+## Running under: Windows 11 x64 (build 26100)
+## 
+## Matrix products: default
+##   LAPACK version 3.12.1
+## 
+## locale:
+## [1] LC_COLLATE=English_Australia.utf8  LC_CTYPE=English_Australia.utf8   
+## [3] LC_MONETARY=English_Australia.utf8 LC_NUMERIC=C                      
+## [5] LC_TIME=English_Australia.utf8    
+## 
+## time zone: Australia/Brisbane
+## tzcode source: internal
+## 
+## attached base packages:
+## [1] stats     graphics  grDevices utils     datasets  methods   base     
+## 
+## other attached packages:
+## [1] rmarkdown_2.29 tidyr_1.3.1    ggplot2_4.0.0  edgeR_4.6.3    limma_3.64.3  
+## [6] stringr_1.5.1  tibble_3.3.0   dplyr_1.1.4    readr_2.1.5   
+## 
+## loaded via a namespace (and not attached):
+##  [1] bit_4.6.0          gtable_0.3.6       jsonlite_2.0.0     crayon_1.5.3      
+##  [5] compiler_4.5.1     tidyselect_1.2.1   parallel_4.5.1     jquerylib_0.1.4   
+##  [9] splines_4.5.1      scales_1.4.0       yaml_2.3.10        fastmap_1.2.0     
+## [13] statmod_1.5.0      lattice_0.22-7     R6_2.6.1           labeling_0.4.3    
+## [17] generics_0.1.4     knitr_1.50         RColorBrewer_1.1-3 bslib_0.9.0       
+## [21] pillar_1.11.1      tzdb_0.5.0         rlang_1.1.6        utf8_1.2.6        
+## [25] cachem_1.1.0       stringi_1.8.7      xfun_0.52          S7_0.2.0          
+## [29] sass_0.4.10        bit64_4.6.0-1      cli_3.6.5          withr_3.0.2       
+## [33] magrittr_2.0.3     digest_0.6.37      grid_4.5.1         locfit_1.5-9.12   
+## [37] vroom_1.6.5        rstudioapi_0.17.1  hms_1.1.3          lifecycle_1.0.4   
+## [41] vctrs_0.6.5        evaluate_1.0.5     glue_1.8.0         farver_2.1.2      
+## [45] purrr_1.1.0        tools_4.5.1        pkgconfig_2.0.3    htmltools_0.5.8.1</code></pre>
+</div>
 </div>
 </div>
 
