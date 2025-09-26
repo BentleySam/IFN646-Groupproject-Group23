@@ -247,14 +247,17 @@ legend("topright", legend = names(treatment_colors),
 
 ```{r within_donor, echo=FALSE}
 samples$treatment <- factor(samples$treatment, levels=c("mock","SARS","Rem"))
+
 ggplot(pca_df, aes(PC1, PC2, colour=treatment, shape=subject)) +
   geom_point(size=3) +
   geom_path(aes(group=subject),
             linewidth=0.6, alpha=0.7,
             arrow=arrow(length=unit(0.15,"cm"), type="closed")) +
+  scale_colour_manual(values = treatment_colors) +
   labs(title=sprintf("PCA — PC1 %.1f%%, PC2 %.1f%%", expl[1], expl[2]))
-
 ```
+
+
 ```{r distances, echo=FALSE, output=FALSE}
 dist_tbl <- pca_df |>
   select(subject, treatment, PC1, PC2) |>
@@ -315,11 +318,13 @@ RLE is centred with comparable spread; S_3–SARS is wider.
 ### MDS Check
 ```{r mds-plot-2, echo=FALSE}
 mds <- limma::plotMDS(lcpm, top = 500, plot = FALSE)
+
 mds_df <- data.frame(MDS1 = mds$x, MDS2 = mds$y,
                      treatment = samples$treatment, subject = samples$subject)
 
 ggplot(mds_df, aes(MDS1, MDS2, colour = treatment, shape = subject)) +
   geom_point(size = 3) +
+  scale_colour_manual(values = treatment_colors) +
   labs(title = "MDS (top 500 genes)")
 ```
 
@@ -332,6 +337,7 @@ ggplot(pca_df, aes(PC1, PC2, colour=treatment, shape=subject)) +
   geom_path(aes(group=subject),
             linewidth=0.6, alpha=0.7,
             arrow=arrow(length=unit(0.15,"cm"), type="closed")) +
+  scale_colour_manual(values = treatment_colors) +
   labs(title=sprintf("PCA — PC1 %.1f%%, PC2 %.1f%%", expl[1], expl[2]))
 
 ```
@@ -350,6 +356,7 @@ pca_df2 <- data.frame(PC1=pc_adj$x[,1], PC2=pc_adj$x[,2],
                       treatment=samples$treatment, subject=samples$subject)
 ggplot(pca_df2, aes(PC1, PC2, colour=treatment, shape=subject)) +
   geom_point(size=3) +
+  scale_colour_manual(values = treatment_colors) +
   labs(title=sprintf("PCA after removing subject effect — PC1 %.1f%%, PC2 %.1f%%", expl[1], expl[2]))
 ```
 
