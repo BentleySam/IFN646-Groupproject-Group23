@@ -1,0 +1,109 @@
+>>> 2025-10-07 18:27:38:127364:	Analysing files...
+
+>>> 2025-10-07 18:27:38:127744:	Batchinator is writing to: /home/axis/tmp/tmpsaz_9jfy
+
+>>> 2025-10-07 18:27:38:127818:	Identifying possible target sites in: /home/axis/crackling_inputs/CXCL10_exon1.fa
+
+>>> 2025-10-07 18:27:38:128071:		Identified 9 possible target sites in this file.
+
+>>> 2025-10-07 18:27:38:128112:		Of these, 0 are not unique. These sites occur a total of 0 times.
+
+>>> 2025-10-07 18:27:38:128133:		Removing 0 of 9 (0.0%) guides.
+
+>>> 2025-10-07 18:27:38:128160:		9 distinct guides have been discovered so far.
+
+>>> 2025-10-07 18:27:38:128190:		Extracted from 100.0% of input
+
+>>> 2025-10-07 18:27:38:128277:	Processing batch file 1 of 1
+
+>>> 2025-10-07 18:27:38:128323:		Loaded 9 guides
+
+>>> 2025-10-07 18:27:38:128349:	CHOPCHOP - remove those without G in position 20.
+
+>>> 2025-10-07 18:27:38:128444:		5 of 9 failed here.
+
+>>> 2025-10-07 18:27:38:128466:	mm10db - remove all targets with a leading T (+) or trailing A (-).
+
+>>> 2025-10-07 18:27:38:128543:		1 of 9 failed here.
+
+>>> 2025-10-07 18:27:38:128564:	mm10db - remove based on AT percent.
+
+>>> 2025-10-07 18:27:38:128649:		1 of 8 failed here.
+
+>>> 2025-10-07 18:27:38:128670:	mm10db - remove all targets that contain TTTT.
+
+>>> 2025-10-07 18:27:38:128737:		0 of 7 failed here.
+
+>>> 2025-10-07 18:27:38:128757:	mm10db - check secondary structure.
+
+>>> 2025-10-07 18:27:38:128840:		Processing page 1 (5,000,000 per page).
+
+>>> 2025-10-07 18:27:38:128867:			Constructing the RNAfold input file.
+
+>>> 2025-10-07 18:27:38:128911:			7 guides in this page.
+
+>>> 2025-10-07 18:27:38:128937:	| Calling: ('RNAfold --noPS -j24 -i /home/axis/cracklingOutput/Task_2_CXCL10-rnafold-input.txt -o',)
+
+>>> 2025-10-07 18:27:38:137559:	| Finished
+
+>>> 2025-10-07 18:27:38:137643:			Starting to process the RNAfold results.
+
+>>> 2025-10-07 18:27:38:137929:		3 of 7 failed here.
+
+>>> 2025-10-07 18:27:38:137971:	Calculating mm10db final result.
+
+>>> 2025-10-07 18:27:38:137994:		4 accepted.
+
+>>> 2025-10-07 18:27:38:138011:		5 failed.
+
+>>> 2025-10-07 18:27:38:138044:	sgRNAScorer2 - score using model.
+
+/home/axis/miniconda3/envs/crackling/lib/python3.11/site-packages/sklearn/base.py:442: InconsistentVersionWarning: Trying to unpickle estimator SVC from version 0.24.2 when using version 1.7.2. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+  warnings.warn(
+>>> 2025-10-07 18:27:38:495536:		2 of 6 failed here.
+
+>>> 2025-10-07 18:27:38:495605:	Evaluating efficiency via consensus approach.
+
+>>> 2025-10-07 18:27:38:495768:		4 of 9 failed here.
+
+>>> 2025-10-07 18:27:38:495884:	Bowtie analysis.
+
+>>> 2025-10-07 18:27:38:495932:		Processing page 1 (5,000,000 per page).
+
+>>> 2025-10-07 18:27:38:495963:		Constructing the Bowtie input file.
+
+>>> 2025-10-07 18:27:38:496075:			5 guides in this page.
+
+>>> 2025-10-07 18:27:38:496109:	| Calling: ('bowtie2 -x /home/axis/genomes/GRCh38 -p 24 --reorder --no-hd -t -r -U /home/axis/cracklingOutput/Task_2_CXCL10-bowtie-input.txt -S /home/axis/cracklingOutput/Task_2_CXCL10-bowtie-output.txt',)
+
+>>> 2025-10-07 18:27:41:366556:	| Finished
+
+>>> 2025-10-07 18:27:41:366629:		Starting to process the Bowtie results.
+
+>>> 2025-10-07 18:27:41:366802:		0 of 5 failed here.
+
+>>> 2025-10-07 18:27:41:366825:	Beginning off-target scoring.
+
+>>> 2025-10-07 18:27:41:366872:		Processing page 1 (5,000,000 per page).
+
+>>> 2025-10-07 18:27:41:366938:			5 guides in this page.
+
+>>> 2025-10-07 18:27:41:366985:	| Calling: ('/home/axis/bin/isslScoreOfftargets /home/axis/genomes/GRCh38_offtargets.issl /home/axis/cracklingOutput/Task_2_CXCL10-0-offtargetscore-input.txt 4 75 and > /home/axis/cracklingOutput/Task_2_CXCL10-0-offtargetscore-output.txt',)
+
+>>> 2025-10-07 18:27:57:763233:	| Finished
+
+>>> 2025-10-07 18:27:57:764024:		5 of 5 failed here.
+
+>>> 2025-10-07 18:27:57:764085:	Writing results to file.
+
+>>> 2025-10-07 18:27:57:764740:	Cleaning auxiliary files
+
+>>> 2025-10-07 18:27:57:764897:	Done.
+
+>>> 2025-10-07 18:27:57:764922:	9 guides evaluated.
+
+>>> 2025-10-07 18:27:57:764959:	This batch ran in 01 00:00:19 (dd hh:mm:ss) or 19.63668131828308 seconds
+
+>>> 2025-10-07 18:27:57:764983:	Total run time (dd hh:mm:ss) or 01 00:00:19 seconds
+
