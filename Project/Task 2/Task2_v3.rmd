@@ -1,0 +1,142 @@
+---
+title: "Finding Guides"
+output: html_document
+knit: (function(input_file, encoding) { rmarkdown::render(input_file, encoding = encoding, output_dir = dirname(input_file)) })
+---
+
+
+# Task 2
+
+From the previous task, we have a list of probable genes for tergeting. 
+
+Our next task is to find guides for these genes.
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+cran_pkgs <- c("readr", "dplyr", "stringr")
+bioc_pkgs  <- c("Biostrings", 
+"BSgenome.Hsapiens.UCSC.hg38") # Gives the genome without needing to keep an eye on the file
+
+for (p in cran_pkgs) {
+  if (!requireNamespace(p, quietly = TRUE)) install.packages(p)
+}
+
+for (p in bioc_pkgs) {
+  if (!requireNamespace(p, quietly = TRUE)) BiocManager::install(p, ask = FALSE)
+}
+
+lapply(c(cran_pkgs, bioc_pkgs), library, character.only = TRUE)
+
+# Ensure the working directory is set to Task 2
+setwd("c:/Users/Axis3/Github Repos/UniWork/IFN646/Project/Task 2")
+```
+
+The top genes from task 1 were:
+
+```{r load_genes}
+csv_path <- file.path("..", "Task 1", "CRISPR_target_shortlist_RELAXED_perDonor.csv")
+
+# read the shortlist CSV (show_col_types = FALSE keeps output tidy)
+genes <- read_csv(csv_path, show_col_types = FALSE)
+
+# quick structure check
+#genes
+
+# pull the top row and print as result
+top_gene <- genes[1,]
+print(top_gene)
+
+```
+
+The top gene was **CXL10**, at ID ENSG00000169245.
+
+This appears to be one of the chemokine ligands, commonly associated with immune responses. 
+
+Theres a fair few papers on this gene, particularly in relation to viral infections, notably HIV. 
+
+It also appears to be linked to COVID-19 severity, speciofically the cytokine storm
+
+This gene may also be a key regulator of the 'cytokine storm' immune response to SARS-CoV-2 infection. [provided by RefSeq, Sep 2020]
+
+
+
+By the Gene differential analysis, this gene was upregulated in infected samples compared to the control.
+
+Finding guides to target this gene and suppress it, may help reduce the immune response, and thus the severity of symptoms.
+
+
+
+
+## Finding a good guides
+
+- Can begin with anything, but will end with GG.
+- Preferably 20 bases long.
+- Should be unique to the target gene, or as close as possible, to avoid off-target effects.
+- Should be in an exon, to ensure it is in the coding region.
+
+```{r find_guides}
+
+# Pull ENSG IDs and Gene Symbols, trimming whitespace
+ensg_ids <- genes %>%
+  mutate(gene = str_trim(gene)) %>%
+  pull(gene)
+gene_symbols <- genes %>%
+    mutate(gene_name = str_trim(gene_name)) %>%
+    pull(gene_name)
+ensg_ids
+gene_symbols
+```
+
+# Tool Choice
+
+As in task 1 We need to use multiple tools in order to be more confident in our guide choices.
+
+---- Take a look at CRISPR DeepEnsemble?
+
+# Identify all potential guides
+
+```{r identify_guides}
+# find all 20bp sequences ending in GG
+pattern <- paste0(strrep("N", 20), "GG")
+
+# find all matches in the genome 
+matches <- Biostrings::vmatchPattern(pattern, Hsapiens, fixed = FALSE)
+
+# quick summary counts
+total_matches <- sum(BiocGenerics::elementNROWS(matches))
+cat("Total match objects (per chromosome/seq):", length(matches), "\n")
+cat("Total matching sites (sum of elementNROWS):", total_matches, "\n")
+```
+
+```{r}
+colnames(cxcl10_data)
+```
+
+```{r load-CXCL10_data}
+
+# from the tracks txt downloaded from UCSC genome browser
+Sys.setenv("VROOM_CONNECTION_SIZE" = 10000000 * 2)  # File is a single line, so increase buffer size
+
+
+datapath <- file.path("Data", "CXCL10_UCSC_track.txt")
+
+cxcl10_data <- read_tsv(datapath, comment = "#", 
+col_names = c("chrom", "chromStart", "chromEnd", "name", "score", "strand", "thickStart", "thickEnd", "itemRgb", "blockCount", "blockSizes", "blockStarts"), 
+show_col_types = FALSE)
+
+# quick look
+cxcl10_data
+
+# split into reasonable dictionary
+cxcl10_dict <- cxcl10_data %>%
+  rowwise() %>%
+  mutate(
+    blockSizes = list(as.integer(unlist(strsplit(blockSizes, ",")))),
+    blockStarts = list(as.integer(unlist(strsplit(blockStarts, ","))))
+  ) %>%
+  ungroup()
+
+cxcl10_dict
+```

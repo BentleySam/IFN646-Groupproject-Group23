@@ -1,0 +1,959 @@
+---
+title: "Finding Guides"
+output: html_document
+knit: (function(input_file, encoding) { rmarkdown::render(input_file, encoding = encoding, output_dir = dirname(input_file)) })
+---
+
+
+# Task 2 - Finding Guides for CXCL10
+
+One of the genes identified by Task 1 was CXCL10. 
+
+This is a gene well documented to be involved in immune responses, particularly in the context of COVID`19.
+
+NCBI Gene ID: [3627](https://www.ncbi.nlm.nih.gov/gene/3627)
+
+Papers listed in NCBI also note its connection with 'cytokine storm' and its potential as a therapeutic target.
+
+To that end, we will now identify potential CRISPR guides for this gene.
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+cran_pkgs <- c("readr", "dplyr", "stringr", "tibble"
+#, "conflicted"
+)
+bioc_pkgs <- c(
+  "Biostrings", "GenomeInfoDb", "AnnotationFilter", "GenomicRanges", "GenomicFeatures",
+  "BSgenome.Hsapiens.UCSC.hg38", "EnsDb.Hsapiens.v86"
+)
+
+# Install missing packages
+for (p in cran_pkgs) if (!requireNamespace(p, quietly = TRUE)) install.packages(p)
+if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+for (p in bioc_pkgs) if (!requireNamespace(p, quietly = TRUE)) BiocManager::install(p, ask = FALSE)
+
+# Load all packages
+invisible(lapply(c(cran_pkgs, bioc_pkgs), library, character.only = TRUE))
+
+# Resolve conflicts explicitly
+## conflicted::conflicts_prefer(dplyr::filter)
+## conflicted::conflicts_prefer(dplyr::select)
+## conflicted::conflicts_prefer(base::setdiff)
+```
+
+```{r load_annotations}
+# Load exon annotations and genome sequence
+Hs <- BSgenome.Hsapiens.UCSC.hg38 # Human genome sequence
+edb <- EnsDb.Hsapiens.v86  # Ensembl gene models
+```
+
+# Load the CXCL10 gene
+/*
+```{r gene_identifier}
+gene_symbol <- "CXCL10"
+
+gr_gene <- genes(edb, filter = AnnotationFilter::SymbolFilter(gene_symbol))
+stopifnot(length(gr_gene) >= 1)
+ensg_id <- gr_gene$gene_id[1]
+
+ex_by_gene <- exonsBy(edb, by = "gene")[[ensg_id]]
+ex_by_gene <- keepStandardChromosomes(ex_by_gene, pruning.mode = "coarse")
+
+# Align name styles (UCSC vs Ensembl)
+GenomeInfoDb::seqlevelsStyle(ex_by_gene) <- GenomeInfoDb::seqlevelsStyle(Hs)
+
+# First exon relative to TSS
+strand_gene <- as.character(strand(reduce(gr_gene)[1]))
+first_exon <- if (strand_gene == "+") {
+  ex_by_gene[which.min(start(ex_by_gene))]
+} else {
+  ex_by_gene[which.max(end(ex_by_gene))]
+}
+
+# Sanity + sequence
+stopifnot(as.character(seqnames(first_exon)) %in% seqlevels(Hs))
+ex_seq <- Biostrings::getSeq(Hs, first_exon)
+
+
+ex_seq
+```
+*/
+
+```{r gene_ident_2, echo=FALSE}
+
+gene_symbol <- "CXCL10"
+gr_gene <- genes(edb, filter = SymbolFilter(gene_symbol))
+ensg_id <- gr_gene$gene_id[1]
+txs <- transcripts(edb, filter = GeneIdFilter(ensg_id))
+tx_ids <- txs$tx_id
+
+# grab the first exon for all transcripts (rather than just one)
+ex_tx <- exons(edb, filter = TxIdFilter(tx_ids), columns = c("tx_id","exon_idx"))
+first_exons_tx <- ex_tx[ex_tx$exon_idx == 1]
+
+# Keep standard chroms & harmonize naming
+first_exons_tx <- keepStandardChromosomes(first_exons_tx, pruning.mode = "coarse")
+seqlevelsStyle(first_exons_tx) <- seqlevelsStyle(Hs)
+
+# drop any duplicates
+key <- paste(seqnames(first_exons_tx), start(first_exons_tx), end(first_exons_tx), strand(first_exons_tx))
+first_exons_tx <- first_exons_tx[!duplicated(key)]
+
+# Get sequences
+seqs <- Biostrings::getSeq(Hs, first_exons_tx)
+names(seqs) <- paste0(
+  gene_symbol, "|tx:", first_exons_tx$tx_id, "|",
+  as.character(seqnames(first_exons_tx)), ":", start(first_exons_tx), "-", end(first_exons_tx),
+  "(", as.character(strand(first_exons_tx)), ")"
+)
+
+## Output for use as a bulk search in Crackling
+out_fa <- "CXCL10_exon1_all_tx.fa"
+Biostrings::writeXStringSet(seqs, filepath = out_fa)
+cat("Wrote:", length(seqs), "first-exon sequences to", out_fa, "\n")
+
+seqs
+
+```
+
+## Find the 20bp guides
+
+Looking for all possible 20bp guides with 'NGG' PAMs in the genome
+
+##### INSANITY CHECK 
+
+Lets have a broader look at the whole human genome to see how many guides we might be potentially overlapping with.
+
+```{r all_guides_genome, include=FALSE, cache=TRUE}
+# Directory + file for caching results
+outdir <- "genome_scan_cache"
+outfile <- file.path(outdir, "ngg_counts_per_chr.tsv")
+
+if (!dir.exists(outdir)) dir.create(outdir, recursive = TRUE)
+
+if (file.exists(outfile)) {
+  # load cached result
+  per_chr <- readr::read_tsv(outfile, show_col_types = FALSE)
+  message("Loaded cached NGG site counts from: ", outfile)
+} else {
+  # compute fresh
+  std_chrs <- GenomeInfoDb::standardChromosomes(Hs)
+  std_chrs <- setdiff(std_chrs, c("chrM"))  # drop mtDNA if you like
+
+  count_chr <- function(chr) {
+    s <- Hs[[chr]]
+    L <- nchar(as.character(s))
+    pamGG <- Biostrings::start(Biostrings::matchPattern("GG", s, fixed=TRUE))
+    pamCC <- Biostrings::end(Biostrings::matchPattern("CC", s, fixed=TRUE))
+    plus  <- sum(pamGG > 20L)
+    minus <- sum(pamCC + 20L <= L)
+    tibble(chr=chr, plus=plus, minus=minus, total=plus+minus, chr_len=L)
+  }
+
+  per_chr <- dplyr::bind_rows(lapply(std_chrs, count_chr))
+  readr::write_tsv(per_chr, outfile)
+  message("Saved NGG site counts to: ", outfile)
+}
+
+# Display
+print(per_chr %>% arrange(factor(chr, levels=per_chr$chr)))
+cat("TOTAL NGG sites (20nt windows valid):", sum(per_chr$total), "\n")
+cat("TOTAL human genome size (excluding chrM):", sum(per_chr$chr_len), "bp\n")
+cat("Average NGG density: ~", round(1e6 * sum(per_chr$total) / sum(per_chr$chr_len)), "sites per Mb\n")
+```
+
+## Finding guides in the exon sequence
+--- By doing this in a helpewr, we can re-use it for Task 3 ---
+
+```{r find_guides_function}
+# Robust NGG guide enumeration for exon sequence in ex_seq[[1]]
+library(Biostrings)
+library(dplyr)
+library(tibble)
+
+seq_nt <- ex_seq[[1]]
+L <- nchar(as.character(seq_nt))  # avoid S4 width() entirely
+
+# PAM positions on the + orientation of the exon sequence
+pamGG <- Biostrings::start(Biostrings::matchPattern("GG", seq_nt, fixed = TRUE))  # NGG on +
+pamCC <- Biostrings::end(  Biostrings::matchPattern("CC", seq_nt, fixed = TRUE))  # NGG on - (as CC on +)
+
+# Precompute candidate 20nt windows; drop anything that spills outside [1..L]
+wins_plus <- tibble(
+  strand  = "+",
+  s_start = pamGG - 20L,
+  s_end   = pamGG - 1L
+) %>% dplyr::filter(s_start >= 1L, s_end <= L, (s_end - s_start + 1L) == 20L)
+
+wins_minus <- tibble(
+  strand  = "-",
+  s_start = pamCC + 1L,
+  s_end   = pamCC + 20L
+) %>% dplyr::filter(s_start >= 1L, s_end <= L, (s_end - s_start + 1L) == 20L)
+
+# Extract sequences using Views() (avoids per-row subseq + list/S4 column issues)
+plus_views  <- Biostrings::Views(seq_nt, start = wins_plus$s_start,  end = wins_plus$s_end)
+minus_views <- Biostrings::Views(seq_nt, start = wins_minus$s_start, end = wins_minus$s_end)
+
+g_plus <- tibble(
+  strand       = "+",
+  spacer       = as.character(plus_views),
+  pam          = "NGG",
+  spacer_start = wins_plus$s_start,
+  spacer_end   = wins_plus$s_end
+)
+
+g_minus <- tibble(
+  strand       = "-",
+  # reverse-complement the extracted windows
+  spacer       = as.character(Biostrings::reverseComplement(Biostrings::DNAStringSet(minus_views))),
+  pam          = "NGG",
+  spacer_start = wins_minus$s_start,
+  spacer_end   = wins_minus$s_end
+)
+
+guides <- dplyr::bind_rows(g_plus, g_minus) %>%
+  dplyr::distinct(spacer, strand, .keep_all = TRUE)
+
+# QC: 30–80% GC and no homopolymer >= 4
+gc_prop <- Biostrings::letterFrequency(Biostrings::DNAStringSet(guides$spacer), letters = "GC", as.prob = TRUE)
+guides <- guides %>%
+  dplyr::mutate(gc = round(100 * gc_prop, 1)) %>%
+  dplyr::filter(dplyr::between(gc, 30, 80),
+                !grepl("(A{4,}|C{4,}|G{4,}|T{4,})", spacer)) %>%
+  dplyr::arrange(spacer_start)
+cat("Candidates before QC:", nrow(g_plus) + nrow(g_minus), "\n")
+cat("Candidates after QC:", nrow(guides), "\n")
+print(utils::head(guides, 5))
+```
+
+Add annotations to the guides
+
+
+
+```{r annotate_guides}
+ex_chrom <- as.character(seqnames(first_exon))
+ex_start <- as.integer(start(first_exon))
+ex_end   <- as.integer(end(first_exon))
+ex_len   <- ex_end - ex_start + 1L
+
+if (strand_gene == "+") {
+  guides <- guides %>%
+    dplyr::mutate(
+      chrom     = ex_chrom,
+      abs_start = ex_start + spacer_start - 1L,
+      abs_end   = ex_start + spacer_end   - 1L
+    )
+} else {
+  rel_start <- guides$spacer_start
+  rel_end   <- guides$spacer_end
+  guides$chrom     <- ex_chrom
+  guides$abs_end   <- ex_end - (rel_start - 1L)
+  guides$abs_start <- ex_end - (rel_end   - 1L)
+}
+```
+
+## Output to check the guides with Bowtie et al for Task 3
+
+```{r sanitise_for_output}
+# --- sanitize columns before writing ---
+# Recompute GC% as a vector
+lf <- Biostrings::letterFrequency(
+  Biostrings::DNAStringSet(guides$spacer),
+  letters = c("G","C"),
+  as.prob = TRUE
+)
+gc_pct <- round(100 * rowSums(lf), 1)
+
+guides_clean <- guides %>%
+  dplyr::mutate(gc = gc_pct) %>%
+  # keep only atomic columns (no matrices/Lists/Views)
+  dplyr::select(
+    strand, spacer, pam,
+    spacer_start, spacer_end,
+    gc,
+    chrom, abs_start, abs_end
+  ) %>%
+  # ensure integer-ish cols are plain numeric/integer
+  dplyr::mutate(
+    spacer_start = as.integer(spacer_start),
+    spacer_end   = as.integer(spacer_end),
+    abs_start    = as.integer(abs_start),
+    abs_end      = as.integer(abs_end)
+  )
+```
+
+```{r output_guides}
+
+### Skip when knitting to avoid overwriting files
+
+if (interactive()) {
+  # Write TSV + FASTA files for Task 3
+  readr::write_tsv(guides_clean, "cxcl10_exon1_guides.tsv")
+
+  fa <- paste0(
+    ">CXCL10_", guides_clean$strand, "_exon1_", guides_clean$abs_start, "-", guides_clean$abs_end, ";PAM=NGG\n",
+    guides_clean$spacer
+  )
+  writeLines(fa, "cxcl10_exon1_guides.fa")
+
+  cat("Wrote:", nrow(guides_clean), "guides\n")
+} else {
+  cat("Skipping file write in non-interactive mode\n")
+}
+```
+
+
+
+```{r output_for_crackling, echo=FALSE}
+
+# since crackling will run outside of R, need to put the exon somewhere for it to grab
+
+names(ex_seq) <- "CXCL10_exon1"
+
+# Write to a FASTA file
+Biostrings::writeXStringSet(ex_seq, "CXCL10_exon1.fa")
+
+cat("Saved FASTA:", "CXCL10_exon1.fa\n")
+```
+
+## Running the tools
+
+Per the lecture (and it being a multi tool approach), I pulled together Crackling as my approach to finding guides.
+
+It also ran quickly, allowed for the verification I would have otherwise done by hand, and was only mildly fiddly to get going. 
+
+First I pulled the GRCh38.p13 reference genome.
+
+That got fed through ISSL to make some reference indexes for off-target analysis.
+
+Also ran the bowtie2 per the included instructions to make corresponding indexes for that tool. 
+
+Finally ran crackling against the exon sequence and guides found above. 
+
+```bash
+
+>>> 2025-10-07 18:27:38:122961: Crackling is starting...
+
+>>> 2025-10-07 18:27:38:127364: Analysing files...
+
+>>> 2025-10-07 18:27:38:127744: Batchinator is writing to: /home/axis/tmp/tmpsaz_9jfy
+
+>>> 2025-10-07 18:27:38:127818: Identifying possible target sites in: /home/axis/crackling_inputs/CXCL10_exon1.fa
+
+>>> 2025-10-07 18:27:38:128071:         Identified 9 possible target sites in this file.
+
+>>> 2025-10-07 18:27:38:128112:         Of these, 0 are not unique. These sites occur a total of 0 times.
+
+>>> 2025-10-07 18:27:38:128133:         Removing 0 of 9 (0.0%) guides.
+
+>>> 2025-10-07 18:27:38:128160:         9 distinct guides have been discovered so far.
+
+>>> 2025-10-07 18:27:38:128190:         Extracted from 100.0% of input
+
+>>> 2025-10-07 18:27:38:128277: Processing batch file 1 of 1
+
+>>> 2025-10-07 18:27:38:128323:         Loaded 9 guides
+
+>>> 2025-10-07 18:27:38:128349: CHOPCHOP - remove those without G in position 20.
+
+>>> 2025-10-07 18:27:38:128444:         5 of 9 failed here.
+
+>>> 2025-10-07 18:27:38:128466: mm10db - remove all targets with a leading T (+) or trailing A (-).
+
+>>> 2025-10-07 18:27:38:128543:         1 of 9 failed here.
+
+>>> 2025-10-07 18:27:38:128564: mm10db - remove based on AT percent.
+
+>>> 2025-10-07 18:27:38:128649:         1 of 8 failed here.
+
+>>> 2025-10-07 18:27:38:128670: mm10db - remove all targets that contain TTTT.
+
+>>> 2025-10-07 18:27:38:128737:         0 of 7 failed here.
+
+>>> 2025-10-07 18:27:38:128757: mm10db - check secondary structure.
+
+>>> 2025-10-07 18:27:38:128840:         Processing page 1 (5,000,000 per page).
+
+>>> 2025-10-07 18:27:38:128867:                 Constructing the RNAfold input file.
+
+>>> 2025-10-07 18:27:38:128911:                 7 guides in this page.
+
+>>> 2025-10-07 18:27:38:128937: | Calling: ('RNAfold --noPS -j24 -i /home/axis/cracklingOutput/Task_2_CXCL10-rnafold-input.txt -o',)
+
+>>> 2025-10-07 18:27:38:137559: | Finished
+
+>>> 2025-10-07 18:27:38:137643:                 Starting to process the RNAfold results.
+
+>>> 2025-10-07 18:27:38:137929:         3 of 7 failed here.
+
+>>> 2025-10-07 18:27:38:137971: Calculating mm10db final result.
+
+>>> 2025-10-07 18:27:38:137994:         4 accepted.
+
+>>> 2025-10-07 18:27:38:138011:         5 failed.
+
+>>> 2025-10-07 18:27:38:138044: sgRNAScorer2 - score using model.
+
+/home/axis/miniconda3/envs/crackling/lib/python3.11/site-packages/sklearn/base.py:442: InconsistentVersionWarning: Trying to unpickle estimator SVC from version 0.24.2 when using version 1.7.2. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+  warnings.warn(
+>>> 2025-10-07 18:27:38:495536:         2 of 6 failed here.
+
+>>> 2025-10-07 18:27:38:495605: Evaluating efficiency via consensus approach.
+
+>>> 2025-10-07 18:27:38:495768:         4 of 9 failed here.
+
+>>> 2025-10-07 18:27:38:495884: Bowtie analysis.
+
+>>> 2025-10-07 18:27:38:495932:         Processing page 1 (5,000,000 per page).
+
+>>> 2025-10-07 18:27:38:495963:         Constructing the Bowtie input file.
+
+>>> 2025-10-07 18:27:38:496075:                 5 guides in this page.
+
+>>> 2025-10-07 18:27:38:496109: | Calling: ('bowtie2 -x /home/axis/genomes/GRCh38 -p 24 --reorder --no-hd -t -r -U /home/axis/cracklingOutput/Task_2_CXCL10-bowtie-input.txt -S /home/axis/cracklingOutput/Task_2_CXCL10-bowtie-output.txt',)
+
+Time loading reference: 00:00:01
+Time loading forward index: 00:00:01
+Time loading mirror index: 00:00:01
+Multiseed full-index search: 00:00:00
+40 reads; of these:
+  40 (100.00%) were unpaired; of these:
+    15 (37.50%) aligned 0 times
+    25 (62.50%) aligned exactly 1 time
+    0 (0.00%) aligned >1 times
+62.50% overall alignment rate
+Time searching: 00:00:03
+Overall time: 00:00:03
+>>> 2025-10-07 18:27:41:366556: | Finished
+
+>>> 2025-10-07 18:27:41:366629:         Starting to process the Bowtie results.
+
+>>> 2025-10-07 18:27:41:366802:         0 of 5 failed here.
+
+>>> 2025-10-07 18:27:41:366825: Beginning off-target scoring.
+
+>>> 2025-10-07 18:27:41:366872:         Processing page 1 (5,000,000 per page).
+
+>>> 2025-10-07 18:27:41:366938:                 5 guides in this page.
+
+>>> 2025-10-07 18:27:41:366985: | Calling: ('/home/axis/bin/isslScoreOfftargets /home/axis/genomes/GRCh38_offtargets.issl /home/axis/cracklingOutput/Task_2_CXCL10-0-offtargetscore-input.txt 4 75 and > /home/axis/cracklingOutput/Task_2_CXCL10-0-offtargetscore-output.txt',)
+
+>>> 2025-10-07 18:27:57:763233: | Finished
+
+>>> 2025-10-07 18:27:57:764024:         5 of 5 failed here.
+
+>>> 2025-10-07 18:27:57:764085: Writing results to file.
+
+>>> 2025-10-07 18:27:57:764740: Cleaning auxiliary files
+
+>>> 2025-10-07 18:27:57:764897: Done.
+
+>>> 2025-10-07 18:27:57:764922: 9 guides evaluated.
+
+>>> 2025-10-07 18:27:57:764959: This batch ran in 01 00:00:19 (dd hh:mm:ss) or 19.63668131828308 seconds
+
+>>> 2025-10-07 18:27:57:764983: Total run time (dd hh:mm:ss) or 01 00:00:19 seconds
+
+(crackling) axis@Axis:~$ exit
+
+```
+
+
+The results were a little disappointing, with no guides passing all filters.
+
+Given the small number of guides to start with after that initial pre-filtering, this is perhaps not too suprising. 
+
+We can take another look, and relax the requirements to see what we might have missed.
+
+By changing the config to avg of the off target sites, we can hopefully see a few starting to creep in.
+
+```bash
+>>> 2025-10-07 18:27:38:122961: Crackling is starting...
+
+>>> 2025-10-07 18:27:38:127364: Analysing files...
+
+>>> 2025-10-07 18:27:38:127744: Batchinator is writing to: /home/axis/tmp/tmpsaz_9jfy
+
+>>> 2025-10-07 18:27:38:127818: Identifying possible target sites in: /home/axis/crackling_inputs/CXCL10_exon1.fa
+
+>>> 2025-10-07 18:27:38:128071:         Identified 9 possible target sites in this file.
+
+>>> 2025-10-07 18:27:38:128112:         Of these, 0 are not unique. These sites occur a total of 0 times.
+
+>>> 2025-10-07 18:27:38:128133:         Removing 0 of 9 (0.0%) guides.
+
+>>> 2025-10-07 18:27:38:128160:         9 distinct guides have been discovered so far.
+
+>>> 2025-10-07 18:27:38:128190:         Extracted from 100.0% of input
+
+>>> 2025-10-07 18:27:38:128277: Processing batch file 1 of 1
+
+>>> 2025-10-07 18:27:38:128323:         Loaded 9 guides
+
+>>> 2025-10-07 18:27:38:128349: CHOPCHOP - remove those without G in position 20.
+
+>>> 2025-10-07 18:27:38:128444:         5 of 9 failed here.
+
+>>> 2025-10-07 18:27:38:128466: mm10db - remove all targets with a leading T (+) or trailing A (-).
+
+>>> 2025-10-07 18:27:38:128543:         1 of 9 failed here.
+
+>>> 2025-10-07 18:27:38:128564: mm10db - remove based on AT percent.
+
+>>> 2025-10-07 18:27:38:128649:         1 of 8 failed here.
+
+>>> 2025-10-07 18:27:38:128670: mm10db - remove all targets that contain TTTT.
+
+>>> 2025-10-07 18:27:38:128737:         0 of 7 failed here.
+
+>>> 2025-10-07 18:27:38:128757: mm10db - check secondary structure.
+
+>>> 2025-10-07 18:27:38:128840:         Processing page 1 (5,000,000 per page).
+
+>>> 2025-10-07 18:27:38:128867:                 Constructing the RNAfold input file.
+
+>>> 2025-10-07 18:27:38:128911:                 7 guides in this page.
+
+>>> 2025-10-07 18:27:38:128937: | Calling: ('RNAfold --noPS -j24 -i /home/axis/cracklingOutput/Task_2_CXCL10-rnafold-input.txt -o',)
+
+>>> 2025-10-07 18:27:38:137559: | Finished
+
+>>> 2025-10-07 18:27:38:137643:                 Starting to process the RNAfold results.
+
+>>> 2025-10-07 18:27:38:137929:         3 of 7 failed here.
+
+>>> 2025-10-07 18:27:38:137971: Calculating mm10db final result.
+
+>>> 2025-10-07 18:27:38:137994:         4 accepted.
+
+>>> 2025-10-07 18:27:38:138011:         5 failed.
+
+>>> 2025-10-07 18:27:38:138044: sgRNAScorer2 - score using model.
+
+/home/axis/miniconda3/envs/crackling/lib/python3.11/site-packages/sklearn/base.py:442: InconsistentVersionWarning: Trying to unpickle estimator SVC from version 0.24.2 when using version 1.7.2. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+  warnings.warn(
+>>> 2025-10-07 18:27:38:495536:         2 of 6 failed here.
+
+>>> 2025-10-07 18:27:38:495605: Evaluating efficiency via consensus approach.
+
+>>> 2025-10-07 18:27:38:495768:         4 of 9 failed here.
+
+>>> 2025-10-07 18:27:38:495884: Bowtie analysis.
+
+>>> 2025-10-07 18:27:38:495932:         Processing page 1 (5,000,000 per page).
+
+>>> 2025-10-07 18:27:38:495963:         Constructing the Bowtie input file.
+
+>>> 2025-10-07 18:27:38:496075:                 5 guides in this page.
+
+>>> 2025-10-07 18:27:38:496109: | Calling: ('bowtie2 -x /home/axis/genomes/GRCh38 -p 24 --reorder --no-hd -t -r -U /home/axis/cracklingOutput/Task_2_CXCL10-bowtie-input.txt -S /home/axis/cracklingOutput/Task_2_CXCL10-bowtie-output.txt',)
+
+Time loading reference: 00:00:01
+Time loading forward index: 00:00:01
+Time loading mirror index: 00:00:01
+Multiseed full-index search: 00:00:00
+40 reads; of these:
+  40 (100.00%) were unpaired; of these:
+    15 (37.50%) aligned 0 times
+    25 (62.50%) aligned exactly 1 time
+    0 (0.00%) aligned >1 times
+62.50% overall alignment rate
+Time searching: 00:00:03
+Overall time: 00:00:03
+>>> 2025-10-07 18:27:41:366556: | Finished
+
+>>> 2025-10-07 18:27:41:366629:         Starting to process the Bowtie results.
+
+>>> 2025-10-07 18:27:41:366802:         0 of 5 failed here.
+
+>>> 2025-10-07 18:27:41:366825: Beginning off-target scoring.
+
+>>> 2025-10-07 18:27:41:366872:         Processing page 1 (5,000,000 per page).
+
+>>> 2025-10-07 18:27:41:366938:                 5 guides in this page.
+
+>>> 2025-10-07 18:27:41:366985: | Calling: ('/home/axis/bin/isslScoreOfftargets /home/axis/genomes/GRCh38_offtargets.issl /home/axis/cracklingOutput/Task_2_CXCL10-0-offtargetscore-input.txt 4 75 and > /home/axis/cracklingOutput/Task_2_CXCL10-0-offtargetscore-output.txt',)
+
+>>> 2025-10-07 18:27:57:763233: | Finished
+
+>>> 2025-10-07 18:27:57:764024:         5 of 5 failed here.
+
+>>> 2025-10-07 18:27:57:764085: Writing results to file.
+
+>>> 2025-10-07 18:27:57:764740: Cleaning auxiliary files
+
+>>> 2025-10-07 18:27:57:764897: Done.
+
+>>> 2025-10-07 18:27:57:764922: 9 guides evaluated.
+
+>>> 2025-10-07 18:27:57:764959: This batch ran in 01 00:00:19 (dd hh:mm:ss) or 19.63668131828308 seconds
+
+>>> 2025-10-07 18:27:57:764983: Total run time (dd hh:mm:ss) or 01 00:00:19 seconds
+
+```
+
+
+Still no wins. We try again, lowering the cut off for offtarget to 65 from 75.
+
+```bash
+(crackling) axis@Axis:~$ Crackling -c '/mnt/c/Users/Axis3/Github Repos/Crackling/config_avg_65.ini'
+>>> 2025-10-07 18:53:10:136186: Crackling is starting...
+
+>>> 2025-10-07 18:53:10:141012: Analysing files...
+
+>>> 2025-10-07 18:53:10:141510: Batchinator is writing to: /home/axis/tmp/tmpc0cstegh
+
+>>> 2025-10-07 18:53:10:141591: Identifying possible target sites in: /home/axis/crackling_inputs/CXCL10_exon1.fa
+
+>>> 2025-10-07 18:53:10:142083:         Identified 9 possible target sites in this file.
+
+>>> 2025-10-07 18:53:10:142119:         Of these, 0 are not unique. These sites occur a total of 0 times.
+
+>>> 2025-10-07 18:53:10:142152:         Removing 0 of 9 (0.0%) guides.
+
+>>> 2025-10-07 18:53:10:142161:         9 distinct guides have been discovered so far.
+
+>>> 2025-10-07 18:53:10:142181:         Extracted from 100.0% of input
+
+>>> 2025-10-07 18:53:10:142487: Processing batch file 1 of 1
+
+>>> 2025-10-07 18:53:10:142545:         Loaded 9 guides
+
+>>> 2025-10-07 18:53:10:142575: CHOPCHOP - remove those without G in position 20.
+
+>>> 2025-10-07 18:53:10:142668:         5 of 9 failed here.
+
+>>> 2025-10-07 18:53:10:142690: mm10db - remove all targets with a leading T (+) or trailing A (-).
+
+>>> 2025-10-07 18:53:10:142757:         1 of 9 failed here.
+
+>>> 2025-10-07 18:53:10:142777: mm10db - remove based on AT percent.
+
+>>> 2025-10-07 18:53:10:142873:         1 of 8 failed here.
+
+>>> 2025-10-07 18:53:10:142894: mm10db - remove all targets that contain TTTT.
+
+>>> 2025-10-07 18:53:10:142971:         0 of 7 failed here.
+
+>>> 2025-10-07 18:53:10:142992: mm10db - check secondary structure.
+
+>>> 2025-10-07 18:53:10:143086:         Processing page 1 (5,000,000 per page).
+
+>>> 2025-10-07 18:53:10:143115:                 Constructing the RNAfold input file.
+
+>>> 2025-10-07 18:53:10:143163:                 7 guides in this page.
+
+>>> 2025-10-07 18:53:10:143178: | Calling: ('RNAfold --noPS -j24 -i /home/axis/cracklingOutput/Task_2_CXCL10_relaxed_avg_65-rnafold-input.txt -o',)
+
+>>> 2025-10-07 18:53:10:155826: | Finished
+
+>>> 2025-10-07 18:53:10:155933:                 Starting to process the RNAfold results.
+
+>>> 2025-10-07 18:53:10:156214:         3 of 7 failed here.
+
+>>> 2025-10-07 18:53:10:156259: Calculating mm10db final result.
+
+>>> 2025-10-07 18:53:10:156282:         4 accepted.
+
+>>> 2025-10-07 18:53:10:156309:         5 failed.
+
+>>> 2025-10-07 18:53:10:156341: sgRNAScorer2 - score using model.
+
+/home/axis/miniconda3/envs/crackling/lib/python3.11/site-packages/sklearn/base.py:442: InconsistentVersionWarning: Trying to unpickle estimator SVC from version 0.24.2 when using version 1.7.2. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+  warnings.warn(
+>>> 2025-10-07 18:53:10:671142:         2 of 6 failed here.
+
+>>> 2025-10-07 18:53:10:671209: Evaluating efficiency via consensus approach.
+
+>>> 2025-10-07 18:53:10:671235:         4 of 9 failed here.
+
+>>> 2025-10-07 18:53:10:671331: Bowtie analysis.
+
+>>> 2025-10-07 18:53:10:671425:         Processing page 1 (5,000,000 per page).
+
+>>> 2025-10-07 18:53:10:671523:         Constructing the Bowtie input file.
+
+>>> 2025-10-07 18:53:10:671600:                 5 guides in this page.
+
+>>> 2025-10-07 18:53:10:671632: | Calling: ('bowtie2 -x /home/axis/genomes/GRCh38 -p 24 --reorder --no-hd -t -r -U /home/axis/cracklingOutput/Task_2_CXCL10_relaxed_avg_65-bowtie-input.txt -S /home/axis/cracklingOutput/Task_2_CXCL10_relaxed_avg_65-bowtie-output.txt',)
+
+Time loading reference: 00:00:01
+Time loading forward index: 00:00:01
+Time loading mirror index: 00:00:01
+Multiseed full-index search: 00:00:00
+40 reads; of these:
+  40 (100.00%) were unpaired; of these:
+    15 (37.50%) aligned 0 times
+    25 (62.50%) aligned exactly 1 time
+    0 (0.00%) aligned >1 times
+62.50% overall alignment rate
+Time searching: 00:00:03
+Overall time: 00:00:03
+>>> 2025-10-07 18:53:13:544854: | Finished
+
+>>> 2025-10-07 18:53:13:544931:         Starting to process the Bowtie results.
+
+>>> 2025-10-07 18:53:13:545135:         0 of 5 failed here.
+
+>>> 2025-10-07 18:53:13:545169: Beginning off-target scoring.
+
+>>> 2025-10-07 18:53:13:545201:         Processing page 1 (5,000,000 per page).
+
+>>> 2025-10-07 18:53:13:545270:                 5 guides in this page.
+
+>>> 2025-10-07 18:53:13:545308: | Calling: ('/home/axis/bin/isslScoreOfftargets /home/axis/genomes/GRCh38_offtargets.issl /home/axis/cracklingOutput/Task_2_CXCL10_relaxed_avg_65-0-offtargetscore-input.txt 4 65 avg > /home/axis/cracklingOutput/Task_2_CXCL10_relaxed_avg_65-0-offtargetscore-output.txt',)
+
+>>> 2025-10-07 18:53:29:690500: | Finished
+
+>>> 2025-10-07 18:53:29:691069:         1 of 5 failed here.
+
+>>> 2025-10-07 18:53:29:691141: Writing results to file.
+
+>>> 2025-10-07 18:53:29:691607: Cleaning auxiliary files
+
+>>> 2025-10-07 18:53:29:691859: Done.
+
+>>> 2025-10-07 18:53:29:691920: 9 guides evaluated.
+
+>>> 2025-10-07 18:53:29:691968: This batch ran in 01 00:00:19 (dd hh:mm:ss) or 19.549478769302368 seconds
+
+>>> 2025-10-07 18:53:29:692013: Total run time (dd hh:mm:ss) or 01 00:00:19 seconds
+
+```
+
+
+#### SIDEQUEST Taking a step back
+
+What I'm seeing here is suggesting to me that my initial guide set is just too small to get anything that passes all the filters.
+
+So one solution is to relax the initial filtering, and take more guides forward to the crackling step.
+
+In theory ChopChop and other tools will handle filtering down to a manageable number, so we can be a bit more generous up front.
+
+```{r find_more_guides_function}
+
+# Rework guides to allow for more candidates
+
+# Function to rework guides with relaxed criteria
+find_more_guides <- function(ex_seq) {
+  library(Biostrings)
+  library(dplyr)
+  library(tibble)
+  
+  seq_nt <- ex_seq[[1]]
+  L <- nchar(as.character(seq_nt))  # Length of the sequence
+  
+  # PAM positions on the + and - strands
+  pamGG <- Biostrings::start(Biostrings::matchPattern("GG", seq_nt, fixed = TRUE))  # NGG on +
+  pamCC <- Biostrings::end(Biostrings::matchPattern("CC", seq_nt, fixed = TRUE))   # NGG on - (as CC on +)
+  
+  # Precompute candidate 20nt windows; drop anything that spills outside [1..L]
+  wins_plus <- tibble(
+    strand  = "+",
+    s_start = pamGG - 20L,
+    s_end   = pamGG - 1L
+  ) %>% dplyr::filter(s_start >= 1L, s_end <= L)
+  
+  wins_minus <- tibble(
+    strand  = "-",
+    s_start = pamCC + 1L,
+    s_end   = pamCC + 20L
+  ) %>% dplyr::filter(s_start >= 1L, s_end <= L)
+  
+  # Extract sequences using Views() (avoids per-row subseq + list/S4 column issues)
+  plus_views  <- Biostrings::Views(seq_nt, start = wins_plus$s_start, end = wins_plus$s_end)
+  minus_views <- Biostrings::Views(seq_nt, start = wins_minus$s_start, end = wins_minus$s_end)
+  
+  g_plus <- tibble(
+    strand       = "+",
+    spacer       = as.character(plus_views),
+    pam          = "NGG",
+    spacer_start = wins_plus$s_start,
+    spacer_end   = wins_plus$s_end
+  )
+  
+  g_minus <- tibble(
+    strand       = "-",
+    # Reverse-complement the extracted windows
+    spacer       = as.character(Biostrings::reverseComplement(Biostrings::DNAStringSet(minus_views))),
+    pam          = "NGG",
+    spacer_start = wins_minus$s_start,
+    spacer_end   = wins_minus$s_end
+  )
+  
+  # Combine guides and relax QC criteria
+  guides <- dplyr::bind_rows(g_plus, g_minus) %>%
+    dplyr::distinct(spacer, strand, .keep_all = TRUE) %>%
+    dplyr::mutate(gc = Biostrings::letterFrequency(Biostrings::DNAStringSet(spacer), letters = "GC", as.prob = TRUE) * 100) %>%
+    dplyr::filter(
+      dplyr::between(gc, 20, 85),  # Relaxed GC content range
+      !grepl("(A{5,}|C{5,}|G{5,}|T{5,})", spacer)  # Allow homopolymers up to 5
+    ) %>%
+    dplyr::arrange(spacer_start)
+  
+  cat("Candidates after relaxed QC:", nrow(guides), "\n")
+  return(guides)
+}
+
+relaxed_guides <- find_more_guides(ex_seq)
+
+print(utils::head(relaxed_guides, 5))
+
+```
+
+Nope, this shows that there are still only 9 candidates after even a relaxed filtering. So thats not the problem.
+
+
+## Trying again
+
+Taking another shot, this time with a config file that uses average offtarget score, and a cut off of 65.
+
+In theory this should let at least a few guides through.
+
+```bash
+
+(crackling) axis@Axis:~$ Crackling -c '/mnt/c/Users/Axis3/Github Repos/Crackling/config_avg_65.ini'
+>>> 2025-10-07 18:53:10:136186: Crackling is starting...
+
+>>> 2025-10-07 18:53:10:141012: Analysing files...
+
+>>> 2025-10-07 18:53:10:141510: Batchinator is writing to: /home/axis/tmp/tmpc0cstegh
+
+>>> 2025-10-07 18:53:10:141591: Identifying possible target sites in: /home/axis/crackling_inputs/CXCL10_exon1.fa
+
+>>> 2025-10-07 18:53:10:142083:         Identified 9 possible target sites in this file.
+
+>>> 2025-10-07 18:53:10:142119:         Of these, 0 are not unique. These sites occur a total of 0 times.
+
+>>> 2025-10-07 18:53:10:142152:         Removing 0 of 9 (0.0%) guides.
+
+>>> 2025-10-07 18:53:10:142161:         9 distinct guides have been discovered so far.
+
+>>> 2025-10-07 18:53:10:142181:         Extracted from 100.0% of input
+
+>>> 2025-10-07 18:53:10:142487: Processing batch file 1 of 1
+
+>>> 2025-10-07 18:53:10:142545:         Loaded 9 guides
+
+>>> 2025-10-07 18:53:10:142575: CHOPCHOP - remove those without G in position 20.
+
+>>> 2025-10-07 18:53:10:142668:         5 of 9 failed here.
+
+>>> 2025-10-07 18:53:10:142690: mm10db - remove all targets with a leading T (+) or trailing A (-).
+
+>>> 2025-10-07 18:53:10:142757:         1 of 9 failed here.
+
+>>> 2025-10-07 18:53:10:142777: mm10db - remove based on AT percent.
+
+>>> 2025-10-07 18:53:10:142873:         1 of 8 failed here.
+
+>>> 2025-10-07 18:53:10:142894: mm10db - remove all targets that contain TTTT.
+
+>>> 2025-10-07 18:53:10:142971:         0 of 7 failed here.
+
+>>> 2025-10-07 18:53:10:142992: mm10db - check secondary structure.
+
+>>> 2025-10-07 18:53:10:143086:         Processing page 1 (5,000,000 per page).
+
+>>> 2025-10-07 18:53:10:143115:                 Constructing the RNAfold input file.
+
+>>> 2025-10-07 18:53:10:143163:                 7 guides in this page.
+
+>>> 2025-10-07 18:53:10:143178: | Calling: ('RNAfold --noPS -j24 -i /home/axis/cracklingOutput/Task_2_CXCL10_relaxed_avg_65-rnafold-input.txt -o',)
+
+>>> 2025-10-07 18:53:10:155826: | Finished
+
+>>> 2025-10-07 18:53:10:155933:                 Starting to process the RNAfold results.
+
+>>> 2025-10-07 18:53:10:156214:         3 of 7 failed here.
+
+>>> 2025-10-07 18:53:10:156259: Calculating mm10db final result.
+
+>>> 2025-10-07 18:53:10:156282:         4 accepted.
+
+>>> 2025-10-07 18:53:10:156309:         5 failed.
+
+>>> 2025-10-07 18:53:10:156341: sgRNAScorer2 - score using model.
+
+/home/axis/miniconda3/envs/crackling/lib/python3.11/site-packages/sklearn/base.py:442: InconsistentVersionWarning: Trying to unpickle estimator SVC from version 0.24.2 when using version 1.7.2. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+  warnings.warn(
+>>> 2025-10-07 18:53:10:671142:         2 of 6 failed here.
+
+>>> 2025-10-07 18:53:10:671209: Evaluating efficiency via consensus approach.
+
+>>> 2025-10-07 18:53:10:671235:         4 of 9 failed here.
+
+>>> 2025-10-07 18:53:10:671331: Bowtie analysis.
+
+>>> 2025-10-07 18:53:10:671425:         Processing page 1 (5,000,000 per page).
+
+>>> 2025-10-07 18:53:10:671523:         Constructing the Bowtie input file.
+
+>>> 2025-10-07 18:53:10:671600:                 5 guides in this page.
+
+>>> 2025-10-07 18:53:10:671632: | Calling: ('bowtie2 -x /home/axis/genomes/GRCh38 -p 24 --reorder --no-hd -t -r -U /home/axis/cracklingOutput/Task_2_CXCL10_relaxed_avg_65-bowtie-input.txt -S /home/axis/cracklingOutput/Task_2_CXCL10_relaxed_avg_65-bowtie-output.txt',)
+
+Time loading reference: 00:00:01
+Time loading forward index: 00:00:01
+Time loading mirror index: 00:00:01
+Multiseed full-index search: 00:00:00
+40 reads; of these:
+  40 (100.00%) were unpaired; of these:
+    15 (37.50%) aligned 0 times
+    25 (62.50%) aligned exactly 1 time
+    0 (0.00%) aligned >1 times
+62.50% overall alignment rate
+Time searching: 00:00:03
+Overall time: 00:00:03
+>>> 2025-10-07 18:53:13:544854: | Finished
+
+>>> 2025-10-07 18:53:13:544931:         Starting to process the Bowtie results.
+
+>>> 2025-10-07 18:53:13:545135:         0 of 5 failed here.
+
+>>> 2025-10-07 18:53:13:545169: Beginning off-target scoring.
+
+>>> 2025-10-07 18:53:13:545201:         Processing page 1 (5,000,000 per page).
+
+>>> 2025-10-07 18:53:13:545270:                 5 guides in this page.
+
+>>> 2025-10-07 18:53:13:545308: | Calling: ('/home/axis/bin/isslScoreOfftargets /home/axis/genomes/GRCh38_offtargets.issl /home/axis/cracklingOutput/Task_2_CXCL10_relaxed_avg_65-0-offtargetscore-input.txt 4 65 avg > /home/axis/cracklingOutput/Task_2_CXCL10_relaxed_avg_65-0-offtargetscore-output.txt',)
+
+>>> 2025-10-07 18:53:29:690500: | Finished
+
+>>> 2025-10-07 18:53:29:691069:         1 of 5 failed here.
+
+>>> 2025-10-07 18:53:29:691141: Writing results to file.
+
+>>> 2025-10-07 18:53:29:691607: Cleaning auxiliary files
+
+>>> 2025-10-07 18:53:29:691859: Done.
+
+>>> 2025-10-07 18:53:29:691920: 9 guides evaluated.
+
+>>> 2025-10-07 18:53:29:691968: This batch ran in 01 00:00:19 (dd hh:mm:ss) or 19.549478769302368 seconds
+
+>>> 2025-10-07 18:53:29:692013: Total run time (dd hh:mm:ss) or 01 00:00:19 seconds
+
+(crackling) axis@Axis:~$
+
+```
+
+Big key there, I think 4 of the 5 guides passed the offtarget scoring step, so we should have at least a few guides in the final output.
+
+Looking at the final outputs, I can see 4 guides that passed at least 2 tools. 
+
+spacer	pam	strand	bowtieChr	bowtieStart	bowtieEnd	sgrnascorer2score	acceptedByMm10db	mitOfftargetscore	cfdOfftargetscore	consensusCount
+ATATTCTGAGCCTACAGCAG	AGG	+	NC_000004.12	76023451	76023473	1.3219815100738335	0	61.649036	68.720866	2
+AGAATATGTCTAAGCAATTG	AGG	-	NC_000004.12	76023467	76023489	1.0144032326747419	0	58.176478	73.558091	2
+ATTCATGGTGCTGAGACTGG	AGG	-	NC_000004.12	76023426	76023448	?	1	70.573389	60.144769	2
+GATAAGGCAGCAAATCAGAA	TGG	-	NC_000004.12	76023396	76023418	2.0279715929890014	1	60.798494	69.524246	2
+
+
