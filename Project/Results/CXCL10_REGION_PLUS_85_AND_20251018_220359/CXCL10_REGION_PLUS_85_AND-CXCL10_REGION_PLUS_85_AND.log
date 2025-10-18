@@ -1,0 +1,109 @@
+>>> 2025-10-18 22:03:59:702845:	Analysing files...
+
+>>> 2025-10-18 22:03:59:703560:	Batchinator is writing to: /tmp/tmp17sh3_sh
+
+>>> 2025-10-18 22:03:59:703611:	Identifying possible target sites in: /home/axis/crackling_inputs/CXCL10_region_plus_exons.fa
+
+>>> 2025-10-18 22:03:59:704802:		Identified 486 possible target sites in this file.
+
+>>> 2025-10-18 22:03:59:704818:		Of these, 89 are not unique. These sites occur a total of 89 times.
+
+>>> 2025-10-18 22:03:59:704826:		Removing 89 of 486 (18.313%) guides.
+
+>>> 2025-10-18 22:03:59:704831:		397 distinct guides have been discovered so far.
+
+>>> 2025-10-18 22:03:59:704837:		Extracted from 100.0% of input
+
+>>> 2025-10-18 22:03:59:704962:	Processing batch file 1 of 1
+
+>>> 2025-10-18 22:03:59:705276:		Loaded 397 guides
+
+>>> 2025-10-18 22:03:59:705292:	CHOPCHOP - remove those without G in position 20.
+
+>>> 2025-10-18 22:03:59:707411:		236 of 308 failed here.
+
+>>> 2025-10-18 22:03:59:707422:	mm10db - remove all targets with a leading T (+) or trailing A (-).
+
+>>> 2025-10-18 22:03:59:709619:		99 of 308 failed here.
+
+>>> 2025-10-18 22:03:59:709631:	mm10db - remove based on AT percent.
+
+>>> 2025-10-18 22:03:59:711987:		64 of 209 failed here.
+
+>>> 2025-10-18 22:03:59:711998:	mm10db - remove all targets that contain TTTT.
+
+>>> 2025-10-18 22:03:59:714159:		4 of 145 failed here.
+
+>>> 2025-10-18 22:03:59:714170:	mm10db - check secondary structure.
+
+>>> 2025-10-18 22:03:59:716567:		Processing page 1 (5,000,000 per page).
+
+>>> 2025-10-18 22:03:59:716603:			Constructing the RNAfold input file.
+
+>>> 2025-10-18 22:03:59:716679:			141 guides in this page.
+
+>>> 2025-10-18 22:03:59:716691:	| Calling: ('/home/axis/miniconda3/envs/crackling/bin/RNAfold --noPS -j28 -i /home/axis/cracklingOutput/CXCL10_REGION_PLUS_85_AND_20251018_220359/CXCL10_REGION_PLUS_85_AND-rnafold-input.txt -o',)
+
+>>> 2025-10-18 22:03:59:758064:	| Finished
+
+>>> 2025-10-18 22:03:59:758155:			Starting to process the RNAfold results.
+
+>>> 2025-10-18 22:03:59:759724:		44 of 141 failed here.
+
+>>> 2025-10-18 22:03:59:759767:	Calculating mm10db final result.
+
+>>> 2025-10-18 22:03:59:759856:		97 accepted.
+
+>>> 2025-10-18 22:03:59:759861:		300 failed.
+
+>>> 2025-10-18 22:03:59:759869:	sgRNAScorer2 - score using model.
+
+/home/axis/miniconda3/envs/crackling/lib/python3.11/site-packages/sklearn/base.py:442: InconsistentVersionWarning: Trying to unpickle estimator SVC from version 0.24.2 when using version 1.7.2. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+  warnings.warn(
+>>> 2025-10-18 22:04:00:330464:		64 of 121 failed here.
+
+>>> 2025-10-18 22:04:00:330513:	Evaluating efficiency via consensus approach.
+
+>>> 2025-10-18 22:04:00:330952:		316 of 397 failed here.
+
+>>> 2025-10-18 22:04:00:330965:	Bowtie analysis.
+
+>>> 2025-10-18 22:04:00:331047:		Processing page 1 (5,000,000 per page).
+
+>>> 2025-10-18 22:04:00:331076:		Constructing the Bowtie input file.
+
+>>> 2025-10-18 22:04:00:331340:			81 guides in this page.
+
+>>> 2025-10-18 22:04:00:331364:	| Calling: ('/home/axis/miniconda3/envs/crackling/bin/bowtie2 -x /home/axis/genomes/GRCh38 -p 28 --reorder --no-hd -t -r -U /home/axis/cracklingOutput/CXCL10_REGION_PLUS_85_AND_20251018_220359/CXCL10_REGION_PLUS_85_AND-bowtie-input.txt -S /home/axis/cracklingOutput/CXCL10_REGION_PLUS_85_AND_20251018_220359/CXCL10_REGION_PLUS_85_AND-bowtie-output.txt',)
+
+>>> 2025-10-18 22:04:03:234679:	| Finished
+
+>>> 2025-10-18 22:04:03:234746:		Starting to process the Bowtie results.
+
+>>> 2025-10-18 22:04:03:235351:		15 of 81 failed here.
+
+>>> 2025-10-18 22:04:03:235364:	Beginning off-target scoring.
+
+>>> 2025-10-18 22:04:03:235458:		Processing page 1 (5,000,000 per page).
+
+>>> 2025-10-18 22:04:03:235585:			66 guides in this page.
+
+>>> 2025-10-18 22:04:03:235615:	| Calling: ('/home/axis/bin/isslScoreOfftargets /home/axis/genomes/GRCh38_offtargets.issl /home/axis/cracklingOutput/CXCL10_REGION_PLUS_85_AND_20251018_220359/CXCL10_REGION_PLUS_85_AND-0-offtargetscore-input.txt 4 85 and > /home/axis/cracklingOutput/CXCL10_REGION_PLUS_85_AND_20251018_220359/CXCL10_REGION_PLUS_85_AND-0-offtargetscore-output.txt',)
+
+>>> 2025-10-18 22:04:19:205453:	| Finished
+
+>>> 2025-10-18 22:04:19:205920:		61 of 66 failed here.
+
+>>> 2025-10-18 22:04:19:205938:	Writing results to file.
+
+>>> 2025-10-18 22:04:19:206997:	Cleaning auxiliary files
+
+>>> 2025-10-18 22:04:19:207270:	Done.
+
+>>> 2025-10-18 22:04:19:207283:	397 guides evaluated.
+
+>>> 2025-10-18 22:04:19:207295:	This batch ran in 01 00:00:19 (dd hh:mm:ss) or 19.50233483314514 seconds
+
+>>> 2025-10-18 22:04:19:207302:	Total run time (dd hh:mm:ss) or 01 00:00:19 seconds
+

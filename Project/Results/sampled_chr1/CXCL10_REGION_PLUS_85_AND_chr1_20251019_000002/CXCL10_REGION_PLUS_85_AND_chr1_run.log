@@ -1,0 +1,30 @@
++ command -v dos2unix
++ dos2unix -q /home/axis/crackling_inputs/CXCL10_region_plus_exons.fa
++ BOWTIE_PREFIX_PATH=/home/axis/genomes/personalised/multi/GRCh38_sampled_chr1
++ [[ -f GRCh38_offtargets.issl ]]
+++ abspath /home/axis/genomes/personalised/multi/GRCh38_offtargets.issl
+++ python3 - /home/axis/genomes/personalised/multi/GRCh38_offtargets.issl
++ ISSL_PATH=/home/axis/genomes/personalised/multi/GRCh38_offtargets.issl
++ have_bt2=true
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1.1.bt2 ]]
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1.2.bt2 ]]
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1.3.bt2 ]]
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1.4.bt2 ]]
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1.rev.1.bt2 ]]
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1.rev.2.bt2 ]]
++ have_issl=true
++ [[ -s /home/axis/genomes/personalised/multi/GRCh38_offtargets.issl ]]
++ have_issl=false
++ true
++ false
++ [[ -n '' ]]
++ die 'Indices missing. Provide --ref-fasta to build.'
++ echo 'ERROR: Indices missing. Provide --ref-fasta to build.'
+ERROR: Indices missing. Provide --ref-fasta to build.
++ exit 2
