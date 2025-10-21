@@ -1,0 +1,109 @@
+>>> 2025-10-19 21:43:15:082716:	Analysing files...
+
+>>> 2025-10-19 21:43:15:083049:	Batchinator is writing to: /tmp/tmp_ek0bwd8
+
+>>> 2025-10-19 21:43:15:083108:	Identifying possible target sites in: /home/axis/crackling_inputs/IFI44L_region_plus_exons.fa
+
+>>> 2025-10-19 21:43:15:089406:		Identified 3,045 possible target sites in this file.
+
+>>> 2025-10-19 21:43:15:089435:		Of these, 724 are not unique. These sites occur a total of 980 times.
+
+>>> 2025-10-19 21:43:15:089443:		Removing 980 of 3,045 (32.184%) guides.
+
+>>> 2025-10-19 21:43:15:089448:		2,065 distinct guides have been discovered so far.
+
+>>> 2025-10-19 21:43:15:089454:		Extracted from 100.0% of input
+
+>>> 2025-10-19 21:43:15:089596:	Processing batch file 1 of 1
+
+>>> 2025-10-19 21:43:15:091494:		Loaded 2,065 guides
+
+>>> 2025-10-19 21:43:15:091525:	CHOPCHOP - remove those without G in position 20.
+
+>>> 2025-10-19 21:43:15:103188:		1,072 of 1,341 failed here.
+
+>>> 2025-10-19 21:43:15:103242:	mm10db - remove all targets with a leading T (+) or trailing A (-).
+
+>>> 2025-10-19 21:43:15:114755:		416 of 1,341 failed here.
+
+>>> 2025-10-19 21:43:15:114793:	mm10db - remove based on AT percent.
+
+>>> 2025-10-19 21:43:15:127219:		286 of 925 failed here.
+
+>>> 2025-10-19 21:43:15:127291:	mm10db - remove all targets that contain TTTT.
+
+>>> 2025-10-19 21:43:15:138546:		47 of 639 failed here.
+
+>>> 2025-10-19 21:43:15:138617:	mm10db - check secondary structure.
+
+>>> 2025-10-19 21:43:15:150038:		Processing page 1 (5,000,000 per page).
+
+>>> 2025-10-19 21:43:15:150170:			Constructing the RNAfold input file.
+
+>>> 2025-10-19 21:43:15:150364:			592 guides in this page.
+
+>>> 2025-10-19 21:43:15:150381:	| Calling: ('/home/axis/miniconda3/envs/crackling/bin/RNAfold --noPS -j28 -i /home/axis/cracklingOutput/sampled_chr1/IFI44L_REGION_PLUS_85_AND_chr1_20251019_214314/IFI44L_REGION_PLUS_85_AND_chr1-rnafold-input.txt -o',)
+
+>>> 2025-10-19 21:43:15:299992:	| Finished
+
+>>> 2025-10-19 21:43:15:300262:			Starting to process the RNAfold results.
+
+>>> 2025-10-19 21:43:15:304508:		217 of 592 failed here.
+
+>>> 2025-10-19 21:43:15:304556:	Calculating mm10db final result.
+
+>>> 2025-10-19 21:43:15:304998:		375 accepted.
+
+>>> 2025-10-19 21:43:15:305027:		1690 failed.
+
+>>> 2025-10-19 21:43:15:305044:	sgRNAScorer2 - score using model.
+
+/home/axis/miniconda3/envs/crackling/lib/python3.11/site-packages/sklearn/base.py:442: InconsistentVersionWarning: Trying to unpickle estimator SVC from version 0.24.2 when using version 1.7.2. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+  warnings.warn(
+>>> 2025-10-19 21:43:15:894302:		292 of 488 failed here.
+
+>>> 2025-10-19 21:43:15:894404:	Evaluating efficiency via consensus approach.
+
+>>> 2025-10-19 21:43:15:896592:		1,791 of 2,065 failed here.
+
+>>> 2025-10-19 21:43:15:896634:	Bowtie analysis.
+
+>>> 2025-10-19 21:43:15:897004:		Processing page 1 (5,000,000 per page).
+
+>>> 2025-10-19 21:43:15:897047:		Constructing the Bowtie input file.
+
+>>> 2025-10-19 21:43:15:897603:			274 guides in this page.
+
+>>> 2025-10-19 21:43:15:897643:	| Calling: ('/home/axis/miniconda3/envs/crackling/bin/bowtie2 -x /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1 -p 28 --reorder --no-hd -t -r -U /home/axis/cracklingOutput/sampled_chr1/IFI44L_REGION_PLUS_85_AND_chr1_20251019_214314/IFI44L_REGION_PLUS_85_AND_chr1-bowtie-input.txt -S /home/axis/cracklingOutput/sampled_chr1/IFI44L_REGION_PLUS_85_AND_chr1_20251019_214314/IFI44L_REGION_PLUS_85_AND_chr1-bowtie-output.txt',)
+
+>>> 2025-10-19 21:43:18:894792:	| Finished
+
+>>> 2025-10-19 21:43:18:894854:		Starting to process the Bowtie results.
+
+>>> 2025-10-19 21:43:18:896611:		39 of 274 failed here.
+
+>>> 2025-10-19 21:43:18:896642:	Beginning off-target scoring.
+
+>>> 2025-10-19 21:43:18:897048:		Processing page 1 (5,000,000 per page).
+
+>>> 2025-10-19 21:43:18:897145:			235 guides in this page.
+
+>>> 2025-10-19 21:43:18:897167:	| Calling: ('/home/axis/bin/isslScoreOfftargets /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1.issl /home/axis/cracklingOutput/sampled_chr1/IFI44L_REGION_PLUS_85_AND_chr1_20251019_214314/IFI44L_REGION_PLUS_85_AND_chr1-0-offtargetscore-input.txt 4 85 and > /home/axis/cracklingOutput/sampled_chr1/IFI44L_REGION_PLUS_85_AND_chr1_20251019_214314/IFI44L_REGION_PLUS_85_AND_chr1-0-offtargetscore-output.txt',)
+
+>>> 2025-10-19 21:43:34:446634:	| Finished
+
+>>> 2025-10-19 21:43:34:447506:		208 of 235 failed here.
+
+>>> 2025-10-19 21:43:34:447527:	Writing results to file.
+
+>>> 2025-10-19 21:43:34:452688:	Cleaning auxiliary files
+
+>>> 2025-10-19 21:43:34:452886:	Done.
+
+>>> 2025-10-19 21:43:34:452901:	2065 guides evaluated.
+
+>>> 2025-10-19 21:43:34:452919:	This batch ran in 01 00:00:19 (dd hh:mm:ss) or 19.36332368850708 seconds
+
+>>> 2025-10-19 21:43:34:452928:	Total run time (dd hh:mm:ss) or 01 00:00:19 seconds
+

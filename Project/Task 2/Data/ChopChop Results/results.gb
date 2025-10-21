@@ -1,0 +1,38 @@
+LOCUS       1-76021351               396 bp    DNA              UNK 01-JAN-1980
+DEFINITION  CHOPCHOP results.
+ACCESSION   1-76021351
+VERSION     1-76021351
+KEYWORDS    .
+SOURCE      .
+  ORGANISM  .
+            .
+FEATURES             Location/Qualifiers
+     Target_1        complement(299..321)
+     Target_2        complement(68..90)
+     Target_3        complement(114..136)
+     Target_4        108..130
+     Target_5        complement(109..131)
+     Target_6        complement(235..257)
+     Target_7        complement(63..85)
+     Target_8        complement(110..132)
+     Target_9        complement(54..76)
+     Target_10       complement(204..226)
+     Target_11       complement(80..102)
+     Target_12       342..364
+     Target_13       186..208
+     Target_14       complement(51..73)
+     Target_15       complement(162..184)
+     Target_16       45..67
+     Target_17       complement(340..362)
+     Target_18       complement(46..68)
+     Target_19       complement(215..237)
+     gene_loci       1..396
+ORIGIN
+        1 tggaaggaga gagagtggta attctctaac tcatttgtct tctgcccatg ccaccttctt
+       61 ctccaggcca tagatttctc caatctaagt ttcttatgaa ataaatatcc caaccaagtg
+      121 acacacaagg cacttcatct tagttataat tactttatta accttttgat ctttcaacat
+      181 ttagatagtc tttcttaata tttccaggag agtacctcat ttttattttg aaaaccattc
+      241 agcacattta tcttatgtaa catgcagagc atatatctat ctgtattttt aaaattttcc
+      301 tgttactcat tgatacatag tacttaatta catgttattc catgtacact gaaaacaata
+      361 taggaaatat atacatctaa gacttctact ttgtac
+//

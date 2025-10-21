@@ -82,39 +82,52 @@ ex_seq
 */
 
 ```{r gene_ident_2, echo=FALSE}
-
 gene_symbol <- "CXCL10"
 gr_gene <- genes(edb, filter = SymbolFilter(gene_symbol))
+
+## --- widen search space to include promoters/terminators ---
+region <- gr_gene
+start(region) <- start(region) - 1000  # 1kb upstream
+end(region)   <- end(region) + 1000    # 1kb downstream
+region <- keepStandardChromosomes(region, pruning.mode = "coarse")
+
+# Harmonise naming BEFORE extracting sequence
+seqlevelsStyle(region) <- seqlevelsStyle(Hs)
+
+seqs_wide <- Biostrings::getSeq(Hs, region)
+names(seqs_wide) <- paste0(gene_symbol, "_plus_flanks")
+
+## --- extract all exons across transcripts ---
 ensg_id <- gr_gene$gene_id[1]
 txs <- transcripts(edb, filter = GeneIdFilter(ensg_id))
 tx_ids <- txs$tx_id
 
-# grab the first exon for all transcripts (rather than just one)
 ex_tx <- exons(edb, filter = TxIdFilter(tx_ids), columns = c("tx_id","exon_idx"))
-first_exons_tx <- ex_tx[ex_tx$exon_idx == 1]
+ex_tx <- keepStandardChromosomes(ex_tx, pruning.mode = "coarse")
+seqlevelsStyle(ex_tx) <- seqlevelsStyle(Hs)
 
-# Keep standard chroms & harmonize naming
-first_exons_tx <- keepStandardChromosomes(first_exons_tx, pruning.mode = "coarse")
-seqlevelsStyle(first_exons_tx) <- seqlevelsStyle(Hs)
+# Drop duplicates
+key <- paste(seqnames(ex_tx), start(ex_tx), end(ex_tx), strand(ex_tx))
+ex_tx <- ex_tx[!duplicated(key)]
 
-# drop any duplicates
-key <- paste(seqnames(first_exons_tx), start(first_exons_tx), end(first_exons_tx), strand(first_exons_tx))
-first_exons_tx <- first_exons_tx[!duplicated(key)]
-
-# Get sequences
-seqs <- Biostrings::getSeq(Hs, first_exons_tx)
-names(seqs) <- paste0(
-  gene_symbol, "|tx:", first_exons_tx$tx_id, "|",
-  as.character(seqnames(first_exons_tx)), ":", start(first_exons_tx), "-", end(first_exons_tx),
-  "(", as.character(strand(first_exons_tx)), ")"
+seqs_exons <- Biostrings::getSeq(Hs, ex_tx)
+names(seqs_exons) <- paste0(
+  gene_symbol, "|tx:", ex_tx$tx_id, "|",
+  as.character(seqnames(ex_tx)), ":", start(ex_tx), "-", end(ex_tx),
+  "(", as.character(strand(ex_tx)), ")"
 )
 
-## Output for use as a bulk search in Crackling
-out_fa <- "CXCL10_exon1_all_tx.fa"
-Biostrings::writeXStringSet(seqs, filepath = out_fa)
-cat("Wrote:", length(seqs), "first-exon sequences to", out_fa, "\n")
+## --- combine both search spaces ---
+seqs_all <- c(seqs_wide, seqs_exons)
 
-seqs
+## --- write to file ---
+out_fa <- paste0(gene_symbol, "_region_plus_exons.fa")
+Biostrings::writeXStringSet(seqs_all, filepath = out_fa)
+
+cat("Wrote:", length(seqs_all), "sequences to", out_fa, "\n")
+cat("Current working directory:", getwd(), "\n")
+
+seqs_all
 
 ```
 
@@ -957,3 +970,54 @@ ATTCATGGTGCTGAGACTGG	AGG	-	NC_000004.12	76023426	76023448	?	1	70.573389	60.14476
 GATAAGGCAGCAAATCAGAA	TGG	-	NC_000004.12	76023396	76023418	2.0279715929890014	1	60.798494	69.524246	2
 
 
+# Testing Task 3 Works
+
+```{r gene_ident_2, echo=FALSE}
+gene_symbol <- "IFI44L"
+gr_gene <- genes(edb, filter = SymbolFilter(gene_symbol))
+
+## --- widen search space to include promoters/terminators ---
+region <- gr_gene
+start(region) <- start(region) - 1000  # 1kb upstream
+end(region)   <- end(region) + 1000    # 1kb downstream
+region <- keepStandardChromosomes(region, pruning.mode = "coarse")
+
+# Harmonise naming BEFORE extracting sequence
+seqlevelsStyle(region) <- seqlevelsStyle(Hs)
+
+seqs_wide <- Biostrings::getSeq(Hs, region)
+names(seqs_wide) <- paste0(gene_symbol, "_plus_flanks")
+
+## --- extract all exons across transcripts ---
+ensg_id <- gr_gene$gene_id[1]
+txs <- transcripts(edb, filter = GeneIdFilter(ensg_id))
+tx_ids <- txs$tx_id
+
+ex_tx <- exons(edb, filter = TxIdFilter(tx_ids), columns = c("tx_id","exon_idx"))
+ex_tx <- keepStandardChromosomes(ex_tx, pruning.mode = "coarse")
+seqlevelsStyle(ex_tx) <- seqlevelsStyle(Hs)
+
+# Drop duplicates
+key <- paste(seqnames(ex_tx), start(ex_tx), end(ex_tx), strand(ex_tx))
+ex_tx <- ex_tx[!duplicated(key)]
+
+seqs_exons <- Biostrings::getSeq(Hs, ex_tx)
+names(seqs_exons) <- paste0(
+  gene_symbol, "|tx:", ex_tx$tx_id, "|",
+  as.character(seqnames(ex_tx)), ":", start(ex_tx), "-", end(ex_tx),
+  "(", as.character(strand(ex_tx)), ")"
+)
+
+## --- combine both search spaces ---
+seqs_all <- c(seqs_wide, seqs_exons)
+
+## --- write to file ---
+out_fa <- paste0(gene_symbol, "_region_plus_exons.fa")
+Biostrings::writeXStringSet(seqs_all, filepath = out_fa)
+
+cat("Wrote:", length(seqs_all), "sequences to", out_fa, "\n")
+cat("Current working directory:", getwd(), "\n")
+
+seqs_all
+
+```

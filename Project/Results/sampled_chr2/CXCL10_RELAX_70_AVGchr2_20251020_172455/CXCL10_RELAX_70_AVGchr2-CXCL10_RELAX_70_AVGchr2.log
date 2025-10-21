@@ -1,0 +1,109 @@
+>>> 2025-10-20 17:24:56:463047:	Analysing files...
+
+>>> 2025-10-20 17:24:56:463437:	Batchinator is writing to: /tmp/tmp7c6a_uef
+
+>>> 2025-10-20 17:24:56:463487:	Identifying possible target sites in: /home/axis/crackling_inputs/CXCL10_region_plus_exons.fa
+
+>>> 2025-10-20 17:24:56:464792:		Identified 486 possible target sites in this file.
+
+>>> 2025-10-20 17:24:56:464811:		Of these, 89 are not unique. These sites occur a total of 89 times.
+
+>>> 2025-10-20 17:24:56:464820:		Removing 89 of 486 (18.313%) guides.
+
+>>> 2025-10-20 17:24:56:464825:		397 distinct guides have been discovered so far.
+
+>>> 2025-10-20 17:24:56:464831:		Extracted from 100.0% of input
+
+>>> 2025-10-20 17:24:56:464949:	Processing batch file 1 of 1
+
+>>> 2025-10-20 17:24:56:465302:		Loaded 397 guides
+
+>>> 2025-10-20 17:24:56:465323:	CHOPCHOP - remove those without G in position 20.
+
+>>> 2025-10-20 17:24:56:467748:		236 of 308 failed here.
+
+>>> 2025-10-20 17:24:56:467768:	mm10db - remove all targets with a leading T (+) or trailing A (-).
+
+>>> 2025-10-20 17:24:56:470151:		99 of 308 failed here.
+
+>>> 2025-10-20 17:24:56:470164:	mm10db - remove based on AT percent.
+
+>>> 2025-10-20 17:24:56:472847:		64 of 209 failed here.
+
+>>> 2025-10-20 17:24:56:472872:	mm10db - remove all targets that contain TTTT.
+
+>>> 2025-10-20 17:24:56:475422:		4 of 145 failed here.
+
+>>> 2025-10-20 17:24:56:475472:	mm10db - check secondary structure.
+
+>>> 2025-10-20 17:24:56:477839:		Processing page 1 (5,000,000 per page).
+
+>>> 2025-10-20 17:24:56:477880:			Constructing the RNAfold input file.
+
+>>> 2025-10-20 17:24:56:477985:			141 guides in this page.
+
+>>> 2025-10-20 17:24:56:478002:	| Calling: ('/home/axis/miniconda3/envs/crackling/bin/RNAfold --noPS -j28 -i /home/axis/cracklingOutput/sampled_chr2/CXCL10_RELAX_70_AVGchr2_20251020_172455/CXCL10_RELAX_70_AVGchr2-rnafold-input.txt -o',)
+
+>>> 2025-10-20 17:24:56:533965:	| Finished
+
+>>> 2025-10-20 17:24:56:534107:			Starting to process the RNAfold results.
+
+>>> 2025-10-20 17:24:56:536579:		44 of 141 failed here.
+
+>>> 2025-10-20 17:24:56:536639:	Calculating mm10db final result.
+
+>>> 2025-10-20 17:24:56:536770:		97 accepted.
+
+>>> 2025-10-20 17:24:56:536777:		300 failed.
+
+>>> 2025-10-20 17:24:56:536789:	sgRNAScorer2 - score using model.
+
+/home/axis/miniconda3/envs/crackling/lib/python3.11/site-packages/sklearn/base.py:442: InconsistentVersionWarning: Trying to unpickle estimator SVC from version 0.24.2 when using version 1.7.2. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+  warnings.warn(
+>>> 2025-10-20 17:24:57:173659:		64 of 121 failed here.
+
+>>> 2025-10-20 17:24:57:173725:	Evaluating efficiency via consensus approach.
+
+>>> 2025-10-20 17:24:57:174198:		316 of 397 failed here.
+
+>>> 2025-10-20 17:24:57:174210:	Bowtie analysis.
+
+>>> 2025-10-20 17:24:57:174303:		Processing page 1 (5,000,000 per page).
+
+>>> 2025-10-20 17:24:57:174342:		Constructing the Bowtie input file.
+
+>>> 2025-10-20 17:24:57:174558:			81 guides in this page.
+
+>>> 2025-10-20 17:24:57:174586:	| Calling: ('/home/axis/miniconda3/envs/crackling/bin/bowtie2 -x /home/axis/genomes/personalised/multi/GRCh38_sampled_chr2 -p 28 --reorder --no-hd -t -r -U /home/axis/cracklingOutput/sampled_chr2/CXCL10_RELAX_70_AVGchr2_20251020_172455/CXCL10_RELAX_70_AVGchr2-bowtie-input.txt -S /home/axis/cracklingOutput/sampled_chr2/CXCL10_RELAX_70_AVGchr2_20251020_172455/CXCL10_RELAX_70_AVGchr2-bowtie-output.txt',)
+
+>>> 2025-10-20 17:25:03:018701:	| Finished
+
+>>> 2025-10-20 17:25:03:018775:		Starting to process the Bowtie results.
+
+>>> 2025-10-20 17:25:03:019506:		15 of 81 failed here.
+
+>>> 2025-10-20 17:25:03:019529:	Beginning off-target scoring.
+
+>>> 2025-10-20 17:25:03:019641:		Processing page 1 (5,000,000 per page).
+
+>>> 2025-10-20 17:25:03:019744:			66 guides in this page.
+
+>>> 2025-10-20 17:25:03:019776:	| Calling: ('/home/axis/bin/isslScoreOfftargets /home/axis/genomes/personalised/multi/GRCh38_sampled_chr2.issl /home/axis/cracklingOutput/sampled_chr2/CXCL10_RELAX_70_AVGchr2_20251020_172455/CXCL10_RELAX_70_AVGchr2-0-offtargetscore-input.txt 4 50 avg > /home/axis/cracklingOutput/sampled_chr2/CXCL10_RELAX_70_AVGchr2_20251020_172455/CXCL10_RELAX_70_AVGchr2-0-offtargetscore-output.txt',)
+
+>>> 2025-10-20 17:25:26:504064:	| Finished
+
+>>> 2025-10-20 17:25:26:506195:		10 of 66 failed here.
+
+>>> 2025-10-20 17:25:26:506218:	Writing results to file.
+
+>>> 2025-10-20 17:25:26:507647:	Cleaning auxiliary files
+
+>>> 2025-10-20 17:25:26:507903:	Done.
+
+>>> 2025-10-20 17:25:26:507921:	397 guides evaluated.
+
+>>> 2025-10-20 17:25:26:507935:	This batch ran in 01 00:00:30 (dd hh:mm:ss) or 30.04298710823059 seconds
+
+>>> 2025-10-20 17:25:26:507944:	Total run time (dd hh:mm:ss) or 01 00:00:30 seconds
+

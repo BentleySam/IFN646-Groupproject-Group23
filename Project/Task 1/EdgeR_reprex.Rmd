@@ -1,0 +1,325 @@
+```{r reprex-options, include = FALSE}
+options(
+  keep.source = TRUE,
+  crayon.enabled = FALSE,
+  reprex.current_venue = "gh"
+)
+```
+
+```{r, results = 'asis', echo = FALSE, include = file.exists('.Rprofile'), eval = file.exists('.Rprofile')}
+cat(sprintf("*Local `.Rprofile` detected at `%s`*", normalizePath(".Rprofile")))
+```
+
+---
+output:
+  reprex::reprex_document:
+    venue: "gh"
+    advertise: FALSE
+    session_info: TRUE
+    style: TRUE
+    comment: "#;-)"
+    tidyverse_quiet: FALSE
+    std_out_err: TRUE
+knit: reprex::reprex_render
+---
+
+This template demonstrates many of the bells and whistles of the `reprex::reprex_document()` output format. The YAML sets many options to non-default values, such as using `#;-)` as the comment in front of output.
+
+## Code style
+
+Since `style` is `TRUE`, this difficult-to-read code (look at the `.Rmd` source file) will be restyled according to the Tidyverse style guide when it's rendered. Whitespace rationing is not in effect!
+
+```{r}
+x=1;y=2;z=x+y;z
+```
+
+## Quiet tidyverse
+
+The tidyverse meta-package is quite chatty at startup, which can be very useful in exploratory, interactive work. It is often less useful in a reprex, so by default, we suppress this.
+
+However, when `tidyverse_quiet` is `FALSE`, the rendered result will include a tidyverse startup message about package versions and function masking.
+
+```{r, eval = requireNamespace("tidyverse", quietly = TRUE)}
+library(tidyverse)
+```
+
+## Chunks in languages other than R
+
+Remember: knitr supports many other languages than R, so you can reprex bits of code in Python, Ruby, Julia, C++, SQL, and more. Note that, in many cases, this still requires that you have the relevant external interpreter installed.
+
+Let's try Python!
+
+```{python, eval = Sys.which("python") != "", python.reticulate = requireNamespace("reticulate", quietly = TRUE)}
+x = 'hello, python world!'
+print(x.split(' '))
+```
+
+And bash!
+
+```{bash, eval = Sys.which("bash") != ""}
+echo "Hello Bash!";
+pwd;
+ls | head;
+```
+
+Write a function in C++, use Rcpp to wrap it and ...
+
+```{Rcpp, eval = requireNamespace("Rcpp", quietly = TRUE)}
+#include <Rcpp.h>
+using namespace Rcpp;
+
+// [[Rcpp::export]]
+NumericVector timesTwo(NumericVector x) {
+  return x * 2;
+}
+```
+
+then immediately call your C++ function from R!
+
+```{r, eval = requireNamespace("Rcpp", quietly = TRUE)}
+timesTwo(1:4)
+```
+
+## Standard output and error
+
+Some output that you see in an interactive session is not actually captured by rmarkdown, when that same code is executed in the context of an `.Rmd` document. When `std_out_err` is `TRUE`, `reprex::reprex_render()` uses a feature of `callr:r()` to capture such output and then injects it into the rendered result.
+
+Look for this output in a special section of the rendered document (and notice that it does not appear right here).
+
+```{r}
+system2("echo", args = "Output that would normally be lost")
+```
+
+## Session info
+
+Because `session_info` is `TRUE`, the rendered result includes session info, even though no such code is included here in the source document. 
+
+
+
+# Task 0
+
+Clean up the data and prepare for DE analysis with edgeR
+```{r load-packages echo=FALSE}
+
+need <- c("readr","dplyr","tibble","stringr","ggplot2","limma","edgeR")
+have <- rownames(installed.packages())
+if (!"limma" %in% have || !"edgeR" %in% have) {
+  if (!requireNamespace("BiocManager", quietly=TRUE)) install.packages("BiocManager")
+  BiocManager::install(setdiff(c("limma","edgeR"), have), ask=FALSE)
+}
+inst <- setdiff(need, have); if (length(inst)) install.packages(inst)
+
+library(readr); library(dplyr); library(tibble); library(stringr)
+library(limma); library(edgeR); library(ggplot2)
+
+```
+
+```{r load-data echo=FALSE}
+## Load raw data path, adjust as needed
+datafile_path <- "C:/Users/Axis3/Github Repos/UniWork/IFN646/Project/Data/GSE159717_rnaseq_deseq_5dpi_counts_raw.tsv"
+
+df <- read_tsv(datafile_path, show_col_types = FALSE)
+
+# Count columns start with S_
+count_cols <- grep("^S_", names(df), value = TRUE)
+
+# Counts matrix (genes x samples)
+cts <- df %>%
+  select(gene_id, all_of(count_cols)) %>%
+  column_to_rownames("gene_id") %>%
+  as.matrix()
+mode(cts) <- "integer"
+
+# Sample metadata parsed from column names
+samples <- tibble(sample = count_cols) %>%
+  mutate(
+    subject   = str_extract(sample, "^S_\\d+"),
+    treatment = str_extract(sample, "(?i)mock|SARS|Rem"),
+    time      = str_extract(sample, "\\d+dpi"),
+    run       = str_extract(sample, "S\\d+$")
+  ) %>%
+  mutate(
+    treatment = factor(treatment, levels = c("mock","SARS","Rem")),
+    subject   = factor(subject),
+    condition = factor(ifelse(tolower(treatment)=="sars","COVID",
+                       ifelse(tolower(treatment)=="mock","Control","Other")),
+                       levels = c("Control","COVID","Other"))
+  )
+
+stopifnot(all(colnames(cts) == samples$sample))
+cat(sprintf("Genes: %d | Samples: %d\n", nrow(cts), ncol(cts)))
+samples
+```
+
+we're starting with ~60,000 genes, but only 6 samples.
+Two of these samples are treated, so for our purpose (effect of COVID on gene expression) we will focus on the contrast between SARS vs mock (control).
+
+```{r filter-genes echo=FALSE}
+# Filter to genes with at least 10 counts in at least 2 samples
+keep <- rowSums(cts >= 10) >= ceiling(ncol(cts) * 0.5)
+cts  <- cts[keep, , drop=FALSE]
+cat(sprintf("Kept %d genes after filtering\n", nrow(cts)))
+```
+
+```{r design-sars-mock echo=FALSE}
+design <- model.matrix(~ subject + treatment, data = samples)
+colnames(design)
+# Expect: (Intercept) subjectS_3 treatmentSARS treatmentRem
+```
+
+## Limma voom
+```{r stablised-voom echo=FALSE}
+v   <- voom(cts, design, plot=FALSE)
+fit <- eBayes(lmFit(v, design), robust=TRUE, trend=TRUE)
+
+# SARS vs mock coefficient (baseline mock because of factor levels)
+tt_SARS_vs_mock <- topTable(fit, coef = "treatmentSARS", number = Inf)
+
+# Minimum effect test: require |log2FC| >= 1
+fit_treat       <- treat(fit, lfc = 1)
+tt_treat_SARS   <- topTreat(fit_treat, coef = "treatmentSARS", number = Inf)
+
+head(tt_SARS_vs_mock)
+head(tt_treat_SARS)
+```
+
+## Keep all of them, but only contrast COVID vs Control
+
+
+--- Quick guide
+
+LogFC - > Log2 Fold Change (SARS vs mock). Positive = up in SARS, Negative = down in SARS. e.g. 0.66 = 1.6x higher, -0.66 = 1.6x lower than Control.
+
+AveExpr - > Average log2 expression across all samples (transformed CPM). Larger = more highly expressed.
+
+t - > Moderated t-statistic (size of change relative to its variability after limma shrinks the variance)
+
+P.Value - > Raw p-value (unadjusted)
+
+adj.P.Val - > Adjusted p-value (Benjamini-Hochberg FDR correction for multiple testing). Use for significance thresholding.
+
+In the first table also have B
+B - > log-odds that the gene is DE (higher = more likely DE)
+
+
+
+
+## EdgeR Variant
+
+```{r edge-R-setup echo=FALSE}
+
+dge <- DGEList(cts)
+dge <- calcNormFactors(dge, method="TMM")
+dge <- estimateDisp(dge, design, robust=TRUE)
+qlf <- glmQLFit(dge, design, robust=TRUE)
+# Find the column index for treatmentSARS
+coef_idx <- match("treatmentSARS", colnames(design))
+qlt <- glmQLFTest(qlf, coef = coef_idx)
+
+edgeR_res <- topTags(qlt, n=Inf)$table %>%
+  rownames_to_column("gene") %>%
+  transmute(gene,
+            logFC_edgeR = logFC,
+            p_edgeR     = PValue,
+            FDR_edgeR   = FDR)
+
+head(edgeR_res)
+
+
+```
+
+## Check for consensus between limma-voom and edgeR
+
+```{r compare-limma-edger echo=FALSE}
+limma_res <- tt_treat_SARS %>%
+  rownames_to_column("gene") %>%
+  transmute(gene,
+            logFC_limma = logFC,
+            p_limma     = P.Value,
+            FDR_limma   = adj.P.Val)
+
+consensus <- inner_join(limma_res, edgeR_res, by="gene") %>%
+  mutate(
+    agree_dir       = sign(logFC_limma) == sign(logFC_edgeR),
+    pass_limma      = FDR_limma < 0.05 & abs(logFC_limma) >= 1,
+    pass_edgeR      = FDR_edgeR < 0.05 & abs(logFC_edgeR) >= 1,
+    consensus_strict= pass_limma & pass_edgeR & agree_dir,
+    mean_logFC      = (logFC_limma + logFC_edgeR)/2,
+    CRISPR_action   = ifelse(mean_logFC < 0, "CRISPRa (activate)", "CRISPRi (repress)")
+  )
+summary(consensus$consensus_strict)
+```
+
+```{r head-consensus echo=FALSE}
+head(consensus %>% arrange(FDR_limma + FDR_edgeR))
+```
+
+```{r check-consensus_strict echo=FALSE}
+consensus %>%
+  summarise(
+    n = n(),
+    pass_limma = sum(FDR_limma < 0.05 & abs(logFC_limma) >= 1),
+    pass_edgeR = sum(FDR_edgeR < 0.05 & abs(logFC_edgeR) >= 1),
+    agree_dir  = sum(agree_dir),
+    strict     = sum(consensus_strict)
+  )
+```
+
+## Visualise results
+
+```{r MDS-plot}
+# MDS (by Control/COVID labelling)
+cols <- c(Control="grey40", COVID="firebrick", Other="steelblue")
+plotMDS(dge, labels = samples$condition, col = cols[as.character(samples$condition)])
+legend("topright", legend=none, col=cols, pch=16, bty="n")
+
+```
+
+```{r md-plot echo=FALSE}
+# MD plot (edgeR QL test)
+plotMD(qlt, status = decideTestsDGE(qlt), main = "MD plot (edgeR QL)")
+abline(h = c(-1,1), col="darkgrey", lty=2)
+
+```
+
+``` {r volcano-plot echo=FALSE}
+# Volcano (limma-treat)
+vol <- transform(limma_res, negLog10P = -log10(p_limma), sig = FDR_limma < 0.05 & abs(logFC_limma) >= 1)
+plot(vol$logFC_limma, vol$negLog10P,
+     pch=20, cex=0.6, col=ifelse(vol$sig,"firebrick","grey70"),
+     xlab="log2 FC (SARS vs mock, limma-treat)", ylab="-log10 p",
+     main="Volcano (limma-treat)")
+abline(v=c(-1,1), lty=2, col="darkgrey"); abline(h=-log10(0.05), lty=2, col="darkgrey")
+```
+
+
+## Save results for later
+
+```{r save-results echo=FALSE}
+write_csv(samples, "samples_parsed.csv")
+write_tsv(as_tibble(cts, rownames = "gene_id"), "counts_filtered.tsv")
+
+write_csv(tt_SARS_vs_mock %>% rownames_to_column("gene"), "DE_limma_SARS_vs_mock.csv")
+write_csv(tt_treat_SARS  %>% rownames_to_column("gene"), "DE_limma_treat_SARS_vs_mock.csv")
+write_csv(edgeR_res, "DE_edgeRQL_SARS_vs_mock.csv")
+write_csv(consensus, "DE_consensus_limmaTreat_edgeRQL.csv")
+
+# Strict consensus shortlist
+consensus %>%
+  filter(consensus_strict) %>%
+  select(gene, mean_logFC, FDR_limma, FDR_edgeR, CRISPR_action) %>%
+  arrange(FDR_limma + FDR_edgeR) %>%
+  write_csv("CRISPR_target_shortlist.csv")
+```
+
+<details style="margin-bottom:10px;">
+<summary>Standard output and standard error</summary>
+`C:/Users/Axis3/Github Repos/UniWork/IFN646/Project/Task 1/EdgeR_reprex_std_out_err.txt`
+</details>
+
+<details style="margin-bottom:10px;">
+<summary>Session info</summary>
+```{r }
+sessionInfo()
+```
+</details>

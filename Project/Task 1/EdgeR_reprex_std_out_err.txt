@@ -1,0 +1,10 @@
+Invalid syntax for chunk options:
+
+load-packages echo=FALSE
+
+Please see documentation at https://yihui.org/knitr/options/.
+
+Error in parse(text = code, keep.source = FALSE) : 
+  <text>:1:22: unexpected symbol
+1: alist( load-packages echo
+                         ^

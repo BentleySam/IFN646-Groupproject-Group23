@@ -474,6 +474,94 @@ sum_limma_strict <- sum(tt_limma$FDR_limma < 0.05 & abs(tt_limma$logFC_limma) >=
 sum_limma_strict
 ```
 
+```{r limma-strict}
+# Strict winners (limma-treat)
+limma_strict <- tt_limma |>
+  dplyr::filter(FDR_limma < 0.05, abs(logFC_limma) >= 1) |>
+  dplyr::mutate(direction = ifelse(logFC_limma > 0, "up", "down")) |>
+  dplyr::arrange(FDR_limma, dplyr::desc(abs(logFC_limma)))
+
+# A) More decimals directly via kable
+knitr::kable(
+  limma_strict |>
+    dplyr::select(gene, logFC_limma, p_limma, FDR_limma, direction),
+  digits = c(0, 4, 6, 6, 0),  # Gene, log2FC, p, FDR, Direction
+  col.names = c("Gene","log2FC","p","FDR","Direction"),
+  caption = paste0("limma-voom (treat) strict hits (n = ", nrow(limma_strict), ")")
+)
+```
+```{r relaxed_top_ten}
+limma_top10_relaxed <- tt_limma |>
+  dplyr::mutate(direction = ifelse(logFC_limma > 0, "up", "down")) |>
+  dplyr::filter(!(FDR_limma < 0.05 & abs(logFC_limma) >= 1)) |>
+  dplyr::arrange(FDR_limma, dplyr::desc(abs(logFC_limma))) |>
+  dplyr::slice_head(n = 10)
+
+knitr::kable(
+  limma_top10_relaxed |>
+    dplyr::select(gene, logFC_limma, p_limma, FDR_limma, direction),
+  digits = c(0, 4, 6, 6, 0),  # Gene, log2FC, p, FDR, Direction
+  col.names = c("Gene","log2FC","p","FDR","Direction"),
+  caption = "limma-voom (treat): top 10 outside strict cut-offs"
+)
+```
+
+```{r agreement}
+dir_agree <- tt_limma |>
+  dplyr::transmute(gene, sign_limma = sign(logFC_limma)) |>
+  dplyr::inner_join(edgeR_res |>
+                      dplyr::transmute(gene, sign_edgeR = sign(logFC_edgeR)),
+                    by = "gene") |>
+  dplyr::summarise(pct_agree = mean(sign_limma == sign_edgeR) * 100)
+dir_agree$pct_agree
+
+sort(colMeans(v_qw$weights))
+```
+
+```{r weights}
+
+# Recompute with sample weights handy
+v_qw <- limma::voomWithQualityWeights(cts, design, plot = FALSE)
+
+# Prefer the explicit sample weights if present; otherwise fall back to colMeans
+sw_num <- if (!is.null(v_qw$targets$sample.weights)) {
+  as.numeric(v_qw$targets$sample.weights)
+} else {
+  as.numeric(colMeans(v_qw$weights))
+}
+
+sw <- tibble::tibble(
+  sample    = samples$sample,
+  subject   = samples$subject,
+  treatment = samples$treatment,
+  weight    = sw_num
+) |>
+  dplyr::filter(treatment %in% c("mock","SARS")) |>
+  dplyr::arrange(weight) |>
+  dplyr::mutate(rank = dplyr::row_number())
+
+# Table (3 dp)
+knitr::kable(
+  sw |>
+    dplyr::select(rank, sample, subject, treatment, weight),
+  digits = c(0, 0, 0, 0, 3),
+  col.names = c("Rank","Sample","Subject","Treatment","Weight"),
+  caption = "voom sample weights (higher = cleaner)"
+)
+
+# Plot (ordered by weight, with labels)
+library(ggplot2)
+ggplot(sw, aes(x = reorder(sample, weight), y = weight, fill = treatment)) +
+  geom_col() +
+  coord_flip() +
+  geom_text(aes(label = sprintf("%.3f", weight)),
+            hjust = -0.1, size = 3, show.legend = FALSE) +
+  labs(title = "voom sample weights (higher = cleaner)", x = NULL, y = "Weight") +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+  theme_minimal()
+
+```
+
 Per strict results, no significant genes were found at 5% FDR and 2x fold-change.
 
 Given the requirements, and the donor heterogeneity, this is not entirely unexpected.
@@ -526,6 +614,8 @@ edgeR_res <- ed_tab %>%
                    logFC_edgeR = logFC,
                    p_edgeR     = PValue,
                    FDR_edgeR   = FDR)
+
+edgeR_res
 ```
 
 ### Results
@@ -535,8 +625,101 @@ sum_edgeR_strict <- sum(edgeR_res$FDR_edgeR < 0.05 & abs(edgeR_res$logFC_edgeR) 
 sum_edgeR_strict
 ```
 
+```{r strictResults, echo=FALSE}
+# Strict winners table
+edgeR_strict <- edgeR_res |>
+  dplyr::filter(FDR_edgeR < 0.05, abs(logFC_edgeR) >= 1) |>
+  dplyr::mutate(direction = ifelse(logFC_edgeR > 0, "up", "down")) |>
+  dplyr::arrange(FDR_edgeR, dplyr::desc(abs(logFC_edgeR)))
+
+if (nrow(edgeR_strict) == 0) {
+  cat("No genes met FDR < 0.05 and |log2FC| ≥ 1.")
+} else {
+  knitr::kable(
+    edgeR_strict,
+    digits = c(0, 3, 8, 8, 0),   # length must equal ncol shown
+    col.names = c("Gene", "log2FC", "p", "FDR", "Direction"),
+    caption = paste0("edgeR glmTreat strict hits (n = ", nrow(edgeR_strict), ")")
+  )
+}
+```
+```{r Rerun-results, echo= false}
+# edgeR GLM (QL) with TREAT, robust, and filtering
+dge <- edgeR::DGEList(cts)
+keep <- edgeR::filterByExpr(dge, design = design)
+dge <- dge[keep, , keep.lib.sizes = FALSE]
+
+dge <- edgeR::calcNormFactors(dge, method = "TMM")
+dge <- edgeR::estimateDisp(dge, design, robust = TRUE)
+fit <- edgeR::glmQLFit(dge, design, robust = TRUE)
+
+coef_idx <- match("treatmentSARS", colnames(design))
+stopifnot(!is.na(coef_idx))  # fail early if column not found
+
+tab <- edgeR::glmTreat(fit, coef = coef_idx, lfc = 1) |>
+  edgeR::topTags(n = Inf) |> (\(x) x$table)()
+
+edgeR_res <- tab |>
+  tibble::rownames_to_column("gene") |>
+  dplyr::transmute(
+    gene,
+    logFC_edgeR = logFC,
+    p_edgeR     = PValue,
+    FDR_edgeR   = FDR
+  )
+
+sum_edgeR_strict <- sum(edgeR_res$FDR_edgeR < 0.05 & abs(edgeR_res$logFC_edgeR) >= 1)
+
+# Write full results for downstream use
+readr::write_csv(edgeR_res, "edgeR_results.csv")
+
+# Top table for the report
+edgeR_top <- edgeR_res |>
+  dplyr::arrange(FDR_edgeR, dplyr::desc(abs(logFC_edgeR))) |>
+  dplyr::mutate(
+    rank = dplyr::row_number(),
+    direction = dplyr::if_else(logFC_edgeR > 0, "up", "down")
+  ) |>
+  dplyr::select(rank, gene, logFC_edgeR, p_edgeR, FDR_edgeR, direction) |>
+  dplyr::slice_head(n = 25)
+
+knitr::kable(
+  edgeR_top,
+  digits = c(0, 0, 2, 3, 3, 0),
+  align = "rllrrl",
+  caption = paste0("edgeR glmTreat top hits (strict count = ", sum_edgeR_strict, ")")
+)
+```
+
+
 edgeR finds four significant genes at 5% FDR and 2x fold-change, which is a modest improvement over limma voom but still limited by the sample size.
 
+```{r edgeRstrict}
+if (requireNamespace("org.Hs.eg.db", quietly = TRUE)) {
+  ann <- AnnotationDbi::select(
+    org.Hs.eg.db::org.Hs.eg.db,
+    keys   = edgeR_res$gene,
+    keytype= "ENSEMBL",
+    columns= c("SYMBOL","GENENAME")
+  ) |>
+    dplyr::distinct(ENSEMBL, .keep_all = TRUE)
+
+  edgeR_res <- edgeR_res |>
+    dplyr::left_join(ann, by = c("gene" = "ENSEMBL")) |>
+    dplyr::relocate(SYMBOL, GENENAME, .after = gene)
+}
+
+edgeR_strict <- edgeR_res |>
+  dplyr::filter(FDR_edgeR < 0.05, abs(logFC_edgeR) >= 1) |>
+  dplyr::arrange(FDR_edgeR, dplyr::desc(abs(logFC_edgeR)))
+
+knitr::kable(
+  edgeR_strict,
+  digits = c(0, 0, 0, 2, 3, 3),
+  col.names = c("Ensembl","Symbol","Gene name","log2FC","p","FDR"),
+  caption = paste0("edgeR glmTreat strict hits (n = ", nrow(edgeR_strict), ")")
+)
+```
 
 ### Interpretation
 
@@ -552,11 +735,16 @@ Combining results from both methods to find robust DE genes.
 
 ``` {r consensus-fisher, echo=FALSE}
 
-consensus <- dplyr::inner_join(tt_limma, edgeR_res, by="gene") %>%
+consensus <- dplyr::inner_join(tt_limma, edgeR_res, by = "gene") %>%
   dplyr::mutate(
     agree_dir  = sign(logFC_limma) == sign(logFC_edgeR),
-    mean_logFC = (logFC_limma + logFC_edgeR)/2,
-    p_fisher   = pchisq(-2*(log(p_limma) + log(p_edgeR)), df=4, lower.tail=FALSE),
+    mean_logFC = (logFC_limma + logFC_edgeR) / 2,
+    # guard tiny p-values
+    p_fisher   = pchisq(
+      -2 * (log(pmax(p_limma, .Machine$double.xmin)) +
+            log(pmax(p_edgeR, .Machine$double.xmin))),
+      df = 4, lower.tail = FALSE
+    ),
     FDR_fisher = p.adjust(p_fisher, "BH")
   )
 
@@ -585,7 +773,36 @@ short_relaxed <- short_relaxed %>% left_join(gene_map, by="gene") %>%
   relocate(gene_name, .after = gene)
 
 nrow(short_strict); nrow(short_relaxed)
-head(short_relaxed, 10)
+head(short_relaxed, 25)
+```
+
+```{r consensus_relaxed}
+tbl_relaxed <- short_relaxed %>%
+  dplyr::mutate(
+    Direction   = ifelse(mean_logFC > 0, "up", "down"),
+    mean_logFC  = sprintf("%.3f", mean_logFC),
+    p_limma     = formatC(p_limma,  format = "e", digits = 2),
+    p_edgeR     = formatC(p_edgeR,  format = "e", digits = 2),
+    p_fisher    = formatC(p_fisher, format = "e", digits = 2),
+    FDR_fisher  = sprintf("%.6f", FDR_fisher),
+    log2FC_S2   = sprintf("%.2f", log2FC_S2),
+    log2FC_S3   = sprintf("%.2f", log2FC_S3)
+  ) %>%
+  dplyr::select(
+    gene, gene_name, mean_logFC,
+    p_limma, p_edgeR, p_fisher, FDR_fisher,
+    log2FC_S2, log2FC_S3, CRISPR_action, Direction
+  )
+
+knitr::kable(
+  tbl_relaxed,
+  col.names = c(
+    "Gene","Symbol","Mean log2FC",
+    "p (limma)","p (edgeR)","p (Fisher)","FDR (Fisher)",
+    "log2FC S2","log2FC S3","CRISPR action","Direction"
+  ),
+  caption = "Consensus (relaxed): Fisher combined p-values with per-donor guards"
+)
 ```
 
 Under the strict consensus, no genes are found, which is not surprising given the earlier results.
@@ -795,6 +1012,8 @@ short_relaxed %>%
 We export both per-tool and consensus tables and carry the **relaxed consensus top genes** forward as targets for Task 2 intervention design.
 
 
+
+
 ```{r export-results, echo=FALSE}
 readr::write_csv(tt_limma,      "DE_limma_treat_SARS_vs_mock.csv")
 readr::write_csv(edgeR_res,     "DE_edgeR_treat_SARS_vs_mock.csv")
@@ -805,3 +1024,23 @@ cat("\n\nSession info:\n")
 sessionInfo()
 ```
 
+
+
+```{r confirming-REM, echo=FALSE}
+
+# Levels used
+levels(samples$treatment)
+table(samples$treatment)
+
+# What went into the design
+colnames(design)
+head(design)
+
+# Confirm which coefficient you tested
+grep("^treatment", colnames(design), value = TRUE)
+match("treatmentSARS", colnames(design))   # used in limma/edgeR contrasts
+
+# Sanity: edgeR/voom used all samples (including Rem) via this design
+stopifnot(all(colnames(cts) == rownames(design)))
+
+```

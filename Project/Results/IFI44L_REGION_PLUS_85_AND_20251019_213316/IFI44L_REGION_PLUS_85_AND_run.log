@@ -1,0 +1,202 @@
++ command -v dos2unix
++ dos2unix -q /home/axis/crackling_inputs/IFI44L_region_plus_exons.fa
++ BOWTIE_PREFIX_PATH=/home/axis/genomes/GRCh38
++ [[ -f GRCh38_offtargets.issl ]]
+++ abspath /home/axis/genomes/GRCh38_offtargets.issl
+++ python3 - /home/axis/genomes/GRCh38_offtargets.issl
++ ISSL_PATH=/home/axis/genomes/GRCh38_offtargets.issl
++ have_bt2=true
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/GRCh38.1.bt2 ]]
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/GRCh38.2.bt2 ]]
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/GRCh38.3.bt2 ]]
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/GRCh38.4.bt2 ]]
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/GRCh38.rev.1.bt2 ]]
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/GRCh38.rev.2.bt2 ]]
++ have_issl=true
++ [[ -s /home/axis/genomes/GRCh38_offtargets.issl ]]
++ true
++ true
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/GRCh38.1.bt2 ]]
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/GRCh38.2.bt2 ]]
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/GRCh38.3.bt2 ]]
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/GRCh38.4.bt2 ]]
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/GRCh38.rev.1.bt2 ]]
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/GRCh38.rev.2.bt2 ]]
++ [[ -s /home/axis/genomes/GRCh38_offtargets.issl ]]
+++ command -v isslScoreOfftargets
++ ISSLSCORE_BIN=/home/axis/bin/isslScoreOfftargets
++ [[ -n /home/axis/bin/isslScoreOfftargets ]]
+++ command -v bowtie2
++ BOWTIE2_BIN=/home/axis/miniconda3/envs/crackling/bin/bowtie2
+++ command -v RNAfold
++ RNAFOLD_BIN=/home/axis/miniconda3/envs/crackling/bin/RNAfold
+++ python3 -
+<stdin>:4: DeprecationWarning: path is deprecated. Use files() instead. Refer to https://importlib-resources.readthedocs.io/en/latest/using.html#migrating-from-legacy for migration advice.
++ SG_MODEL='/mnt/c/Users/Axis3/Github Repos/Crackling/src/crackling/utils/data/model-py3.txt'
++ : '/mnt/c/Users/Axis3/Github Repos/Crackling/src/crackling/utils/data/model-py3.txt'
++ echo '# Using genome:'
+# Using genome:
++ echo '#   Bowtie2 prefix : /home/axis/genomes/GRCh38'
+#   Bowtie2 prefix : /home/axis/genomes/GRCh38
++ echo '#   ISSL index     : /home/axis/genomes/GRCh38_offtargets.issl'
+#   ISSL index     : /home/axis/genomes/GRCh38_offtargets.issl
++ [[ -f /home/axis/genomes/GRCh38.gff3 ]]
++ CFG=/home/axis/cracklingOutput/IFI44L_REGION_PLUS_85_AND_20251019_213316/IFI44L_REGION_PLUS_85_AND.ini
++ LOGPREFIX=/home/axis/cracklingOutput/IFI44L_REGION_PLUS_85_AND_20251019_213316/IFI44L_REGION_PLUS_85_AND
++ cat
+++ [[ -n /home/axis/genomes/GRCh38.gff3 ]]
+++ echo 'gff-annotation = /home/axis/genomes/GRCh38.gff3'
++ echo '# Wrote config: /home/axis/cracklingOutput/IFI44L_REGION_PLUS_85_AND_20251019_213316/IFI44L_REGION_PLUS_85_AND.ini'
+# Wrote config: /home/axis/cracklingOutput/IFI44L_REGION_PLUS_85_AND_20251019_213316/IFI44L_REGION_PLUS_85_AND.ini
++ rm -f '/home/axis/cracklingOutput/IFI44L_REGION_PLUS_85_AND_20251019_213316/IFI44L_REGION_PLUS_85_AND-*.log' '/home/axis/cracklingOutput/IFI44L_REGION_PLUS_85_AND_20251019_213316/IFI44L_REGION_PLUS_85_AND-*.errlog' /home/axis/cracklingOutput/IFI44L_REGION_PLUS_85_AND_20251019_213316/IFI44L_REGION_PLUS_85_AND-guides.txt
++ Crackling -c /home/axis/cracklingOutput/IFI44L_REGION_PLUS_85_AND_20251019_213316/IFI44L_REGION_PLUS_85_AND.ini
+Time loading reference: 00:00:00
+Time loading forward index: 00:00:02
+Time loading mirror index: 00:00:00
+Multiseed full-index search: 00:00:01
+2192 reads; of these:
+  2192 (100.00%) were unpaired; of these:
+    690 (31.48%) aligned 0 times
+    1120 (51.09%) aligned exactly 1 time
+    382 (17.43%) aligned >1 times
+68.52% overall alignment rate
+Time searching: 00:00:03
+Overall time: 00:00:03
+>>> 2025-10-19 21:33:17:425637:	Crackling is starting...
+
+>>> 2025-10-19 21:33:17:432902:	Analysing files...
+
+>>> 2025-10-19 21:33:17:433285:	Batchinator is writing to: /tmp/tmp0lnbq6cr
+
+>>> 2025-10-19 21:33:17:433336:	Identifying possible target sites in: /home/axis/crackling_inputs/IFI44L_region_plus_exons.fa
+
+>>> 2025-10-19 21:33:17:439062:		Identified 3,045 possible target sites in this file.
+
+>>> 2025-10-19 21:33:17:439096:		Of these, 724 are not unique. These sites occur a total of 980 times.
+
+>>> 2025-10-19 21:33:17:439104:		Removing 980 of 3,045 (32.184%) guides.
+
+>>> 2025-10-19 21:33:17:439109:		2,065 distinct guides have been discovered so far.
+
+>>> 2025-10-19 21:33:17:439115:		Extracted from 100.0% of input
+
+>>> 2025-10-19 21:33:17:439326:	Processing batch file 1 of 1
+
+>>> 2025-10-19 21:33:17:441683:		Loaded 2,065 guides
+
+>>> 2025-10-19 21:33:17:441714:	CHOPCHOP - remove those without G in position 20.
+
+>>> 2025-10-19 21:33:17:453241:		1,072 of 1,341 failed here.
+
+>>> 2025-10-19 21:33:17:453287:	mm10db - remove all targets with a leading T (+) or trailing A (-).
+
+>>> 2025-10-19 21:33:17:464781:		416 of 1,341 failed here.
+
+>>> 2025-10-19 21:33:17:464828:	mm10db - remove based on AT percent.
+
+>>> 2025-10-19 21:33:17:477073:		286 of 925 failed here.
+
+>>> 2025-10-19 21:33:17:477127:	mm10db - remove all targets that contain TTTT.
+
+>>> 2025-10-19 21:33:17:488467:		47 of 639 failed here.
+
+>>> 2025-10-19 21:33:17:488509:	mm10db - check secondary structure.
+
+>>> 2025-10-19 21:33:17:500046:		Processing page 1 (5,000,000 per page).
+
+>>> 2025-10-19 21:33:17:500134:			Constructing the RNAfold input file.
+
+>>> 2025-10-19 21:33:17:500375:			592 guides in this page.
+
+>>> 2025-10-19 21:33:17:500398:	| Calling: ('/home/axis/miniconda3/envs/crackling/bin/RNAfold --noPS -j28 -i /home/axis/cracklingOutput/IFI44L_REGION_PLUS_85_AND_20251019_213316/IFI44L_REGION_PLUS_85_AND-rnafold-input.txt -o',)
+
+>>> 2025-10-19 21:33:17:646829:	| Finished
+
+>>> 2025-10-19 21:33:17:646994:			Starting to process the RNAfold results.
+
+>>> 2025-10-19 21:33:17:653783:		217 of 592 failed here.
+
+>>> 2025-10-19 21:33:17:653856:	Calculating mm10db final result.
+
+>>> 2025-10-19 21:33:17:654598:		375 accepted.
+
+>>> 2025-10-19 21:33:17:654624:		1690 failed.
+
+>>> 2025-10-19 21:33:17:654644:	sgRNAScorer2 - score using model.
+
+/home/axis/miniconda3/envs/crackling/lib/python3.11/site-packages/sklearn/base.py:442: InconsistentVersionWarning: Trying to unpickle estimator SVC from version 0.24.2 when using version 1.7.2. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+  warnings.warn(
+>>> 2025-10-19 21:33:18:300518:		292 of 488 failed here.
+
+>>> 2025-10-19 21:33:18:300575:	Evaluating efficiency via consensus approach.
+
+>>> 2025-10-19 21:33:18:302747:		1,791 of 2,065 failed here.
+
+>>> 2025-10-19 21:33:18:302767:	Bowtie analysis.
+
+>>> 2025-10-19 21:33:18:303126:		Processing page 1 (5,000,000 per page).
+
+>>> 2025-10-19 21:33:18:303178:		Constructing the Bowtie input file.
+
+>>> 2025-10-19 21:33:18:303691:			274 guides in this page.
+
+>>> 2025-10-19 21:33:18:303717:	| Calling: ('/home/axis/miniconda3/envs/crackling/bin/bowtie2 -x /home/axis/genomes/GRCh38 -p 28 --reorder --no-hd -t -r -U /home/axis/cracklingOutput/IFI44L_REGION_PLUS_85_AND_20251019_213316/IFI44L_REGION_PLUS_85_AND-bowtie-input.txt -S /home/axis/cracklingOutput/IFI44L_REGION_PLUS_85_AND_20251019_213316/IFI44L_REGION_PLUS_85_AND-bowtie-output.txt',)
+
+>>> 2025-10-19 21:33:21:235542:	| Finished
+
+>>> 2025-10-19 21:33:21:235598:		Starting to process the Bowtie results.
+
+>>> 2025-10-19 21:33:21:237303:		39 of 274 failed here.
+
+>>> 2025-10-19 21:33:21:237333:	Beginning off-target scoring.
+
+>>> 2025-10-19 21:33:21:237756:		Processing page 1 (5,000,000 per page).
+
+>>> 2025-10-19 21:33:21:237938:			235 guides in this page.
+
+>>> 2025-10-19 21:33:21:237990:	| Calling: ('/home/axis/bin/isslScoreOfftargets /home/axis/genomes/GRCh38_offtargets.issl /home/axis/cracklingOutput/IFI44L_REGION_PLUS_85_AND_20251019_213316/IFI44L_REGION_PLUS_85_AND-0-offtargetscore-input.txt 4 85 and > /home/axis/cracklingOutput/IFI44L_REGION_PLUS_85_AND_20251019_213316/IFI44L_REGION_PLUS_85_AND-0-offtargetscore-output.txt',)
+
+>>> 2025-10-19 21:33:38:076916:	| Finished
+
+>>> 2025-10-19 21:33:38:078194:		208 of 235 failed here.
+
+>>> 2025-10-19 21:33:38:078223:	Writing results to file.
+
+>>> 2025-10-19 21:33:38:083587:	Cleaning auxiliary files
+
+>>> 2025-10-19 21:33:38:083913:	Done.
+
+>>> 2025-10-19 21:33:38:083930:	2065 guides evaluated.
+
+>>> 2025-10-19 21:33:38:083945:	This batch ran in 01 00:00:20 (dd hh:mm:ss) or 20.644619464874268 seconds
+
+>>> 2025-10-19 21:33:38:083963:	Total run time (dd hh:mm:ss) or 01 00:00:20 seconds
+
++ GUIDES=/home/axis/cracklingOutput/IFI44L_REGION_PLUS_85_AND_20251019_213316/IFI44L_REGION_PLUS_85_AND-guides.txt
++ [[ -s /home/axis/cracklingOutput/IFI44L_REGION_PLUS_85_AND_20251019_213316/IFI44L_REGION_PLUS_85_AND-guides.txt ]]
++ SUMMARY=/home/axis/cracklingOutput/IFI44L_REGION_PLUS_85_AND_20251019_213316/IFI44L_REGION_PLUS_85_AND_final_guides_summary.csv
++ python3 - /home/axis/cracklingOutput/IFI44L_REGION_PLUS_85_AND_20251019_213316/IFI44L_REGION_PLUS_85_AND-guides.txt /home/axis/cracklingOutput/IFI44L_REGION_PLUS_85_AND_20251019_213316/IFI44L_REGION_PLUS_85_AND_final_guides_summary.csv
+Wrote /home/axis/cracklingOutput/IFI44L_REGION_PLUS_85_AND_20251019_213316/IFI44L_REGION_PLUS_85_AND_final_guides_summary.csv
++ set +x
+
+=== DONE ===
+Run root         : /home/axis/cracklingOutput/IFI44L_REGION_PLUS_85_AND_20251019_213316
+Master run log   : /home/axis/cracklingOutput/IFI44L_REGION_PLUS_85_AND_20251019_213316/IFI44L_REGION_PLUS_85_AND_run.log
+Crackling logs   : /home/axis/cracklingOutput/IFI44L_REGION_PLUS_85_AND_20251019_213316/IFI44L_REGION_PLUS_85_AND-*.log / *.errlog
+Guides (full)    : /home/axis/cracklingOutput/IFI44L_REGION_PLUS_85_AND_20251019_213316/IFI44L_REGION_PLUS_85_AND-guides.txt
+Guides (summary) : /home/axis/cracklingOutput/IFI44L_REGION_PLUS_85_AND_20251019_213316/IFI44L_REGION_PLUS_85_AND_final_guides_summary.csv
+
+Don't forget to cite: Bradford, Chappell, Perrin. The CRISPR Journal (2022) doi:10.1089/crispr.2021.0102

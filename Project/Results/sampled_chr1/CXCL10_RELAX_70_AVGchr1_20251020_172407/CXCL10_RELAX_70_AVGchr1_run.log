@@ -1,0 +1,202 @@
++ command -v dos2unix
++ dos2unix -q /home/axis/crackling_inputs/CXCL10_region_plus_exons.fa
++ BOWTIE_PREFIX_PATH=/home/axis/genomes/personalised/multi/GRCh38_sampled_chr1
++ [[ -f /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1.issl ]]
+++ abspath /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1.issl
+++ python3 - /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1.issl
++ ISSL_PATH=/home/axis/genomes/personalised/multi/GRCh38_sampled_chr1.issl
++ have_bt2=true
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1.1.bt2 ]]
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1.2.bt2 ]]
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1.3.bt2 ]]
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1.4.bt2 ]]
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1.rev.1.bt2 ]]
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1.rev.2.bt2 ]]
++ have_issl=true
++ [[ -s /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1.issl ]]
++ true
++ true
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1.1.bt2 ]]
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1.2.bt2 ]]
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1.3.bt2 ]]
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1.4.bt2 ]]
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1.rev.1.bt2 ]]
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1.rev.2.bt2 ]]
++ [[ -s /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1.issl ]]
+++ command -v isslScoreOfftargets
++ ISSLSCORE_BIN=/home/axis/bin/isslScoreOfftargets
++ [[ -n /home/axis/bin/isslScoreOfftargets ]]
+++ command -v bowtie2
++ BOWTIE2_BIN=/home/axis/miniconda3/envs/crackling/bin/bowtie2
+++ command -v RNAfold
++ RNAFOLD_BIN=/home/axis/miniconda3/envs/crackling/bin/RNAfold
+++ python3 -
+<stdin>:4: DeprecationWarning: path is deprecated. Use files() instead. Refer to https://importlib-resources.readthedocs.io/en/latest/using.html#migrating-from-legacy for migration advice.
++ SG_MODEL='/mnt/c/Users/Axis3/Github Repos/Crackling/src/crackling/utils/data/model-py3.txt'
++ : '/mnt/c/Users/Axis3/Github Repos/Crackling/src/crackling/utils/data/model-py3.txt'
++ echo '# Using genome:'
+# Using genome:
++ echo '#   Bowtie2 prefix : /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1'
+#   Bowtie2 prefix : /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1
++ echo '#   ISSL index     : /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1.issl'
+#   ISSL index     : /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1.issl
++ [[ -f /home/axis/genomes/GRCh38.gff3 ]]
++ CFG=/home/axis/cracklingOutput/sampled_chr1/CXCL10_RELAX_70_AVGchr1_20251020_172407/CXCL10_RELAX_70_AVGchr1.ini
++ LOGPREFIX=/home/axis/cracklingOutput/sampled_chr1/CXCL10_RELAX_70_AVGchr1_20251020_172407/CXCL10_RELAX_70_AVGchr1
++ cat
+++ [[ -n /home/axis/genomes/GRCh38.gff3 ]]
+++ echo 'gff-annotation = /home/axis/genomes/GRCh38.gff3'
++ echo '# Wrote config: /home/axis/cracklingOutput/sampled_chr1/CXCL10_RELAX_70_AVGchr1_20251020_172407/CXCL10_RELAX_70_AVGchr1.ini'
+# Wrote config: /home/axis/cracklingOutput/sampled_chr1/CXCL10_RELAX_70_AVGchr1_20251020_172407/CXCL10_RELAX_70_AVGchr1.ini
++ rm -f '/home/axis/cracklingOutput/sampled_chr1/CXCL10_RELAX_70_AVGchr1_20251020_172407/CXCL10_RELAX_70_AVGchr1-*.log' '/home/axis/cracklingOutput/sampled_chr1/CXCL10_RELAX_70_AVGchr1_20251020_172407/CXCL10_RELAX_70_AVGchr1-*.errlog' /home/axis/cracklingOutput/sampled_chr1/CXCL10_RELAX_70_AVGchr1_20251020_172407/CXCL10_RELAX_70_AVGchr1-guides.txt
++ Crackling -c /home/axis/cracklingOutput/sampled_chr1/CXCL10_RELAX_70_AVGchr1_20251020_172407/CXCL10_RELAX_70_AVGchr1.ini
+Time loading reference: 00:00:01
+Time loading forward index: 00:00:01
+Time loading mirror index: 00:00:01
+Multiseed full-index search: 00:00:00
+648 reads; of these:
+  648 (100.00%) were unpaired; of these:
+    185 (28.55%) aligned 0 times
+    318 (49.07%) aligned exactly 1 time
+    145 (22.38%) aligned >1 times
+71.45% overall alignment rate
+Time searching: 00:00:03
+Overall time: 00:00:03
+>>> 2025-10-20 17:24:07:752373:	Crackling is starting...
+
+>>> 2025-10-20 17:24:07:766262:	Analysing files...
+
+>>> 2025-10-20 17:24:07:766729:	Batchinator is writing to: /tmp/tmpnzbr1gqd
+
+>>> 2025-10-20 17:24:07:766793:	Identifying possible target sites in: /home/axis/crackling_inputs/CXCL10_region_plus_exons.fa
+
+>>> 2025-10-20 17:24:07:767928:		Identified 486 possible target sites in this file.
+
+>>> 2025-10-20 17:24:07:767944:		Of these, 89 are not unique. These sites occur a total of 89 times.
+
+>>> 2025-10-20 17:24:07:767951:		Removing 89 of 486 (18.313%) guides.
+
+>>> 2025-10-20 17:24:07:767956:		397 distinct guides have been discovered so far.
+
+>>> 2025-10-20 17:24:07:767962:		Extracted from 100.0% of input
+
+>>> 2025-10-20 17:24:07:768050:	Processing batch file 1 of 1
+
+>>> 2025-10-20 17:24:07:768363:		Loaded 397 guides
+
+>>> 2025-10-20 17:24:07:768379:	CHOPCHOP - remove those without G in position 20.
+
+>>> 2025-10-20 17:24:07:770463:		236 of 308 failed here.
+
+>>> 2025-10-20 17:24:07:770473:	mm10db - remove all targets with a leading T (+) or trailing A (-).
+
+>>> 2025-10-20 17:24:07:772745:		99 of 308 failed here.
+
+>>> 2025-10-20 17:24:07:772784:	mm10db - remove based on AT percent.
+
+>>> 2025-10-20 17:24:07:775543:		64 of 209 failed here.
+
+>>> 2025-10-20 17:24:07:775577:	mm10db - remove all targets that contain TTTT.
+
+>>> 2025-10-20 17:24:07:777746:		4 of 145 failed here.
+
+>>> 2025-10-20 17:24:07:777756:	mm10db - check secondary structure.
+
+>>> 2025-10-20 17:24:07:779929:		Processing page 1 (5,000,000 per page).
+
+>>> 2025-10-20 17:24:07:779970:			Constructing the RNAfold input file.
+
+>>> 2025-10-20 17:24:07:780104:			141 guides in this page.
+
+>>> 2025-10-20 17:24:07:780124:	| Calling: ('/home/axis/miniconda3/envs/crackling/bin/RNAfold --noPS -j28 -i /home/axis/cracklingOutput/sampled_chr1/CXCL10_RELAX_70_AVGchr1_20251020_172407/CXCL10_RELAX_70_AVGchr1-rnafold-input.txt -o',)
+
+>>> 2025-10-20 17:24:07:822970:	| Finished
+
+>>> 2025-10-20 17:24:07:823072:			Starting to process the RNAfold results.
+
+>>> 2025-10-20 17:24:07:824728:		44 of 141 failed here.
+
+>>> 2025-10-20 17:24:07:824761:	Calculating mm10db final result.
+
+>>> 2025-10-20 17:24:07:824847:		97 accepted.
+
+>>> 2025-10-20 17:24:07:824852:		300 failed.
+
+>>> 2025-10-20 17:24:07:824860:	sgRNAScorer2 - score using model.
+
+/home/axis/miniconda3/envs/crackling/lib/python3.11/site-packages/sklearn/base.py:442: InconsistentVersionWarning: Trying to unpickle estimator SVC from version 0.24.2 when using version 1.7.2. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+  warnings.warn(
+>>> 2025-10-20 17:24:08:399399:		64 of 121 failed here.
+
+>>> 2025-10-20 17:24:08:399451:	Evaluating efficiency via consensus approach.
+
+>>> 2025-10-20 17:24:08:399864:		316 of 397 failed here.
+
+>>> 2025-10-20 17:24:08:399876:	Bowtie analysis.
+
+>>> 2025-10-20 17:24:08:399987:		Processing page 1 (5,000,000 per page).
+
+>>> 2025-10-20 17:24:08:400023:		Constructing the Bowtie input file.
+
+>>> 2025-10-20 17:24:08:400235:			81 guides in this page.
+
+>>> 2025-10-20 17:24:08:400260:	| Calling: ('/home/axis/miniconda3/envs/crackling/bin/bowtie2 -x /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1 -p 28 --reorder --no-hd -t -r -U /home/axis/cracklingOutput/sampled_chr1/CXCL10_RELAX_70_AVGchr1_20251020_172407/CXCL10_RELAX_70_AVGchr1-bowtie-input.txt -S /home/axis/cracklingOutput/sampled_chr1/CXCL10_RELAX_70_AVGchr1_20251020_172407/CXCL10_RELAX_70_AVGchr1-bowtie-output.txt',)
+
+>>> 2025-10-20 17:24:11:376652:	| Finished
+
+>>> 2025-10-20 17:24:11:376713:		Starting to process the Bowtie results.
+
+>>> 2025-10-20 17:24:11:377422:		15 of 81 failed here.
+
+>>> 2025-10-20 17:24:11:377452:	Beginning off-target scoring.
+
+>>> 2025-10-20 17:24:11:377553:		Processing page 1 (5,000,000 per page).
+
+>>> 2025-10-20 17:24:11:377640:			66 guides in this page.
+
+>>> 2025-10-20 17:24:11:377667:	| Calling: ('/home/axis/bin/isslScoreOfftargets /home/axis/genomes/personalised/multi/GRCh38_sampled_chr1.issl /home/axis/cracklingOutput/sampled_chr1/CXCL10_RELAX_70_AVGchr1_20251020_172407/CXCL10_RELAX_70_AVGchr1-0-offtargetscore-input.txt 4 50 avg > /home/axis/cracklingOutput/sampled_chr1/CXCL10_RELAX_70_AVGchr1_20251020_172407/CXCL10_RELAX_70_AVGchr1-0-offtargetscore-output.txt',)
+
+>>> 2025-10-20 17:24:28:469345:	| Finished
+
+>>> 2025-10-20 17:24:28:479266:		11 of 66 failed here.
+
+>>> 2025-10-20 17:24:28:479298:	Writing results to file.
+
+>>> 2025-10-20 17:24:28:480562:	Cleaning auxiliary files
+
+>>> 2025-10-20 17:24:28:480749:	Done.
+
+>>> 2025-10-20 17:24:28:480762:	397 guides evaluated.
+
+>>> 2025-10-20 17:24:28:480775:	This batch ran in 01 00:00:20 (dd hh:mm:ss) or 20.71272587776184 seconds
+
+>>> 2025-10-20 17:24:28:480784:	Total run time (dd hh:mm:ss) or 01 00:00:20 seconds
+
++ GUIDES=/home/axis/cracklingOutput/sampled_chr1/CXCL10_RELAX_70_AVGchr1_20251020_172407/CXCL10_RELAX_70_AVGchr1-guides.txt
++ [[ -s /home/axis/cracklingOutput/sampled_chr1/CXCL10_RELAX_70_AVGchr1_20251020_172407/CXCL10_RELAX_70_AVGchr1-guides.txt ]]
++ SUMMARY=/home/axis/cracklingOutput/sampled_chr1/CXCL10_RELAX_70_AVGchr1_20251020_172407/CXCL10_RELAX_70_AVGchr1_final_guides_summary.csv
++ python3 - /home/axis/cracklingOutput/sampled_chr1/CXCL10_RELAX_70_AVGchr1_20251020_172407/CXCL10_RELAX_70_AVGchr1-guides.txt /home/axis/cracklingOutput/sampled_chr1/CXCL10_RELAX_70_AVGchr1_20251020_172407/CXCL10_RELAX_70_AVGchr1_final_guides_summary.csv
+Wrote /home/axis/cracklingOutput/sampled_chr1/CXCL10_RELAX_70_AVGchr1_20251020_172407/CXCL10_RELAX_70_AVGchr1_final_guides_summary.csv
++ set +x
+
+=== DONE ===
+Run root         : /home/axis/cracklingOutput/sampled_chr1/CXCL10_RELAX_70_AVGchr1_20251020_172407
+Master run log   : /home/axis/cracklingOutput/sampled_chr1/CXCL10_RELAX_70_AVGchr1_20251020_172407/CXCL10_RELAX_70_AVGchr1_run.log
+Crackling logs   : /home/axis/cracklingOutput/sampled_chr1/CXCL10_RELAX_70_AVGchr1_20251020_172407/CXCL10_RELAX_70_AVGchr1-*.log / *.errlog
+Guides (full)    : /home/axis/cracklingOutput/sampled_chr1/CXCL10_RELAX_70_AVGchr1_20251020_172407/CXCL10_RELAX_70_AVGchr1-guides.txt
+Guides (summary) : /home/axis/cracklingOutput/sampled_chr1/CXCL10_RELAX_70_AVGchr1_20251020_172407/CXCL10_RELAX_70_AVGchr1_final_guides_summary.csv
+
+Don't forget to cite: Bradford, Chappell, Perrin. The CRISPR Journal (2022) doi:10.1089/crispr.2021.0102

@@ -1,0 +1,488 @@
+```{r reprex-options, include = FALSE}
+options(
+  keep.source = TRUE,
+  crayon.enabled = FALSE,
+  reprex.current_venue = "gh"
+)
+```
+
+```{r, results = 'asis', echo = FALSE, include = file.exists('.Rprofile'), eval = file.exists('.Rprofile')}
+cat(sprintf("*Local `.Rprofile` detected at `%s`*", normalizePath(".Rprofile")))
+```
+
+---
+output:
+  reprex::reprex_document:
+    venue: "gh"
+    advertise: FALSE
+    session_info: TRUE
+    style: TRUE
+    comment: "#;-)"
+    tidyverse_quiet: FALSE
+    std_out_err: TRUE
+knit: reprex::reprex_render
+---
+
+
+
+# Task 1 - Differential Expression Analysis
+
+Clean up the data and prepare for DE analysis with edgeR
+```{r load-packages, echo=FALSE}
+
+##### Checks for the required packages, install if missing #####
+
+need <- c("readr","dplyr","tibble","stringr","ggplot2","limma","edgeR", "tidyr", "rmarkdown")
+have <- rownames(installed.packages())
+if (!"limma" %in% have || !"edgeR" %in% have) {
+  if (!requireNamespace("BiocManager", quietly=TRUE)) install.packages("BiocManager")
+  BiocManager::install(setdiff(c("limma","edgeR"), have), ask=FALSE)
+}
+inst <- setdiff(need, have); if (length(inst)) install.packages(inst)
+
+library(readr); library(dplyr); library(tibble); library(stringr)
+library(limma); library(edgeR); library(ggplot2); library(tidyr); library(rmarkdown)
+
+```
+
+```{r load-data, echo=FALSE}
+## Load raw data path, adjust as needed
+datafile_path <- "C:/Users/Axis3/Github Repos/UniWork/IFN646/Project/Data/GSE159717_rnaseq_deseq_5dpi_counts_raw.tsv"
+
+df <- read_tsv(datafile_path, show_col_types = FALSE)
+
+# Count columns start with S_
+count_cols <- grep("^S_", names(df), value = TRUE)
+
+# Counts matrix (genes x samples)
+cts <- df %>%
+  select(gene_id, all_of(count_cols)) %>%
+  column_to_rownames("gene_id") %>%
+  as.matrix()
+mode(cts) <- "integer"
+
+# Sample metadata parsed from column names
+samples <- tibble(sample = count_cols) %>%
+  mutate(
+    subject   = str_extract(sample, "^S_\\d+"), # subject (per Slack, means experiment each with replicates)
+    treatment = str_extract(sample, "(?i)mock|SARS|Rem"), # treatment (case insensitive)
+    time      = str_extract(sample, "\\d+dpi"), # timepoint (days post infection) - Not used
+    run       = str_extract(sample, "S\\d+$") # sequencing run - Not used
+  ) %>%
+  mutate( ### factorise the variables and relabel conditions
+    treatment = factor(treatment, levels = c("mock","SARS","Rem")),
+    subject   = factor(subject),
+    condition = factor(ifelse(tolower(treatment)=="sars","COVID",
+                       ifelse(tolower(treatment)=="mock","Control","Other")),
+                       levels = c("Control","COVID","Other"))
+  )
+
+stopifnot(all(colnames(cts) == samples$sample))
+cat(sprintf("Genes: %d | Samples: %d\n", nrow(cts), ncol(cts)))
+samples
+```
+
+We start off by importing packages (tidyverse, limma, edgeR etc), and load in the raw data counts from the provided tsv file. Parsing those, we create the counts matrix and sample metadata as separate objects. That makes it easier to work with in later steps.
+
+## Data 
+
+After loading the data we're starting with ~60,000 genes, across the six samples. 
+
+The treatments/condition outline the different categories, with subject indicating the donor (experiment) each with replicates. Time and run are not used in the design, as they are confounded with treatment.
+
+Ordinarily, we would filter out the samples belonging to the REM treatment, as  our focus is on the COVID vs Control. However, due to the small sample size (n=2 per group), we will retain all samples for the DE analysis to maximize statistical power, and only report on the SARS vs mock contrast. 
+
+That way the REM samples can still contribute to controlling the subject variation, and accordingly make the COVID vs Control contrast more robust.
+
+## Filtering Genes
+
+```{r filter-genes, echo=FALSE}
+
+# base filter, dropping all below 10, didn't help much. Too much noise.
+
+# changing to protein-coding + filterByExpr from edgeR increases power
+
+# Filter to protein-coding genes, then expression-aware filter
+pc_ids <- df %>% dplyr::filter(gene_biotype == "protein_coding") %>% pull(gene_id)
+cts_pc <- cts[rownames(cts) %in% pc_ids, , drop = FALSE]
+
+# design we'll re-use later
+design <- model.matrix(~ subject + treatment, data = samples)
+design_simple <- model.matrix(~ treatment, data = samples)
+
+# edgeR’s filterByExpr keeps genes with enough counts given your design/groups
+keep <- edgeR::filterByExpr(cts_pc, design = design)
+cts  <- cts_pc[keep, , drop = FALSE]
+
+cat(sprintf("Kept %d genes after PC + filterByExpr\n", nrow(cts)))
+colnames(design)
+
+```
+
+To reduce multiple-testing issues, and increase power, we drop uninformative rows and non-protein-coding genes. This is done by leveraging edgeR's filterByExpr function, which keeps genes with enough counts given the design/groups.
+
+The effect of this is dropping the gene count from ~60,000 to ~15,000, which is a more manageable number for DE analysis.
+
+## Design Notes
+
+We'll take a moment here to consider this design, as its a bit unintuitive.
+
+Essentially since we have such a low sample count, we want to ensure that whatever variance we find is due to the factor of interest, and not an artefact of individual variability. Under normal circumstances, we would have many more samples and many more replicates, which would help to average out individual variability.
+
+Since we don't have that luxury here, we instead try to account for it in the design. This is done by including the subject (donor) as a blocking factor, which helps to control for individual variability.
+
+
+``` {r donor-agreement, echo=FALSE}
+y <- edgeR::cpm(edgeR::DGEList(cts), log=TRUE, prior.count=1)
+diff_S2 <- y[, "S_2_SARS_5dpi_S70003"] - y[, "S_2_mock_5dpi_S70002"]
+diff_S3 <- y[, "S_3_SARS_5dpi_S69996"] - y[, "S_3_mock_5dpi_S69997"]
+
+plot(diff_S2, diff_S3, pch=16, cex=0.4,
+     xlab="log2FC (S_2: SARS - mock)", ylab="log2FC (S_3: SARS - mock)")
+abline(0,1,lty=2,col="grey40")
+cor(diff_S2, diff_S3, use="complete.obs")
+```
+
+Per-donor SARS–mock log2FCs hardly correlate (ρ ≈ −0.02), i.e., donors don’t move in lockstep. With only two donors, that heterogeneity plus BH explains why single-tool FDR finds no hits.
+
+``` {r sample-weights, echo=FALSE}
+v_qw <- limma::voomWithQualityWeights(cts, design, plot = FALSE)
+sw <- tibble(sample   = samples$sample,
+             subject  = samples$subject,
+             treatment= samples$treatment,
+             weight   = as.numeric(colMeans(v_qw$weights))) %>%
+      dplyr::filter(treatment %in% c("mock","SARS")) %>%
+      arrange(weight)
+sw
+
+ggplot(sw, aes(x = reorder(sample, weight), y = weight, fill = treatment)) +
+  geom_col() + coord_flip() +
+  labs(title = "voom sample weights (higher = cleaner)", x = "", y = "weight") +
+  theme_minimal()
+```
+
+One SARS sample has the lowest weight by far, indicating that its the noisiest. Voom downweights automatically, but with only 2 donors, it still limits power.
+
+We'll keep it for now, but we will have to keep it in mind when assessing the robustness of our findings.
+
+
+## Limma voom
+Limma Voom combines the voom transformation (which models the mean–variance relationship of RNA-seq counts) with the limma linear modelling and empirical Bayes framework. This approach converts count data to log-counts per million (logCPM) with precision weights, then fits fast, flexible linear models.
+
+### Benefits
+
+- Handles thousands of genes and potentially complex designs with ease.
+- Simple to handle covariates, blocking or paired samples (which is useful in this instance)
+- Bayes moderation improves the stability (but really needs the replicates to be equal to or greater than 4, see limitations)
+- Contrasts and effect size thresholds are easy to implement.
+
+### Limitations
+
+- Difficulty handling small sample sizes (a significant issue here)
+- Difficulty with sparse data sets (not as much an issue)
+- Assumes a log normalised data, rather than modelling counts directly. This is surmountable.
+
+### Differential Analysis
+
+With only two samples (effectively) per group, limma will struggle on its own. It will get signal, but it is unlikely that it will be able to reach statistically robust conclusions without help. 
+
+
+``` {r stablised-voom, echo=FALSE}
+## ---- limma-treat,, echo=FALSE ----
+fit_lm  <- limma::eBayes(limma::lmFit(v_qw, design), robust=TRUE, trend=TRUE)
+
+# Minimum effect: |log2FC| >= 1 (2x). For exploratory, also try 0.58 (~1.5x).
+tt_limma <- limma::topTreat(fit_lm, coef="treatmentSARS", lfc=1, number=Inf) %>%
+  tibble::rownames_to_column("gene") %>%
+  dplyr::transmute(gene,
+                   logFC_limma = logFC,
+                   p_limma     = P.Value,
+                   FDR_limma   = adj.P.Val)
+```
+
+### Results
+
+```{r limma-results, echo=FALSE}
+sum_limma_strict <- sum(tt_limma$FDR_limma < 0.05 & abs(tt_limma$logFC_limma) >= 1)
+sum_limma_strict
+```
+
+Per strict results, no significant genes were found at 5% FDR and 2x fold-change.
+
+Given the requirements, and the donor heterogeneity, this is not entirely unexpected.
+
+### Interpretation
+The lack of significant genes under strict criteria suggests that the observed changes may not be robust, potentially due to the limited sample size and high variability.
+
+Limma voom is generally a powerful method, but with only two donors per group and considerable variability, it struggles to identify significant DE genes under stringent thresholds.
+
+One solution is to relax the criteria, for example by lowering the fold-change threshold to 1.5x (log2FC of 0.58). This can help to identify more genes that may be biologically relevant, albeit with a higher risk of false positives.
+
+We can also use the second DE tool, edgeR, to provide an independent check on the findings. If both methods agree on certain genes, we can be more confident in their validity, even if they don't meet the strictest criteria in either method alone.
+
+## DESeq2
+
+## EdgeR
+
+EdgeR is another widely used tool for differential expression analysis for RNA data. It models the count data directly against a negative binomial distribution, a natural fit for RNA's dispersed seq counts. It estimates the common, trended and tagwise distributions and only then fits the GLM (Generalised Linear Model) to test for the DE.
+
+In this instance we also use the glmQLFit to implement treast-style testing with a minimum log-fold threshold.
+
+### Benefits
+
+- Negative Binomial works well with small sample sizes (good in this instance)
+- Robust dispersion estimates can handle the outliers reliably.
+- GLM's accomodate complex contrasts, covariates and paired designs (useful in this case)
+- Also allows for the treat-style tests, letting us check against the minimum meaningul log fold change.
+
+### Limmitations
+
+- It does rely on the NB being a good fit. If there are extreme outliers, or an otherwise distorted distribution, this will challenge it.
+- While its possible to handle continous data, it requires a chunk of work. Given counts as our base data, we can somewhat handle this.
+- Complexity compounds quickly, once we start venturing past the base into QL vs LRT or treat vs standard. Increases the risk of a poor conclusion.
+
+### Differential Analysis
+
+With our dataset only having the effective 2 samples per group, edgeR is generally more reliable, but will still have issues without more replicates. If the variance isn't controlled confidently, it will miss true signals. 
+
+``` {r edger-treat, echo=FALSE}
+dge <- edgeR::DGEList(cts) |> edgeR::calcNormFactors("TMM")
+dge <- edgeR::estimateDisp(dge, design, robust=TRUE)
+qlf <- edgeR::glmQLFit(dge, design, robust=TRUE)
+
+coef_idx <- match("treatmentSARS", colnames(design))
+ed_tab <- edgeR::topTags(edgeR::glmTreat(qlf, coef=coef_idx, lfc=1), n=Inf)$table
+
+edgeR_res <- ed_tab %>%
+  tibble::rownames_to_column("gene") %>%
+  dplyr::transmute(gene,
+                   logFC_edgeR = logFC,
+                   p_edgeR     = PValue,
+                   FDR_edgeR   = FDR)
+```
+
+### Results
+
+``` {r edgeR-results, echo=FALSE}
+sum_edgeR_strict <- sum(edgeR_res$FDR_edgeR < 0.05 & abs(edgeR_res$logFC_edgeR) >= 1)
+sum_edgeR_strict
+```
+
+EdgeR finds four significant genes at 5% FDR and 2x fold-change, which is a modest improvement over limma voom but still limited by the sample size.
+
+
+### Interpretation
+
+Even with robust NB modelling, the tiny n and high donor variability restrict statistical power. 
+
+Again, under normal circumstances with more samples, we would expect more robust findings. Given the current constraints, we can consider relaxing the criteria to identify more potential DE genes.
+
+In the interim, we can combine the results from both methods. If both methods agree on certain genes, we can be more confident in their validity, even if they don't meet the strictest criteria in either method alone.
+
+## Consensus
+
+Combining results from both methods to find robust DE genes.
+
+``` {r consensus-fisher, echo=FALSE}
+
+consensus <- dplyr::inner_join(tt_limma, edgeR_res, by="gene") %>%
+  dplyr::mutate(
+    agree_dir  = sign(logFC_limma) == sign(logFC_edgeR),
+    mean_logFC = (logFC_limma + logFC_edgeR)/2,
+    p_fisher   = pchisq(-2*(log(p_limma) + log(p_edgeR)), df=4, lower.tail=FALSE),
+    FDR_fisher = p.adjust(p_fisher, "BH")
+  )
+
+# Per-donor effects for a minimal guard
+per_donor_fc <- tibble(gene = rownames(cts),
+                       log2FC_S2 = diff_S2,
+                       log2FC_S3 = diff_S3)
+
+# Strict (often 0 here)
+short_strict <- consensus %>%
+  filter(agree_dir, FDR_limma < 0.05, FDR_edgeR < 0.05, abs(mean_logFC) >= 1)
+
+# Relaxed (exploratory): Fisher < 0.10, ≥1.5x mean, same direction
+short_relaxed <- consensus %>%
+  filter(agree_dir, FDR_fisher < 0.10, abs(mean_logFC) >= 0.58) %>%
+  left_join(per_donor_fc, by="gene") %>%
+  filter(abs(log2FC_S2) >= 0.3, abs(log2FC_S3) >= 0.3) %>%  # per-donor safeguard
+  arrange(FDR_fisher) %>%
+  mutate(CRISPR_action = ifelse(mean_logFC < 0, "CRISPRa (activate)", "CRISPRi (repress)"))
+
+list(strict_n = nrow(short_strict), relaxed_n = nrow(short_relaxed))  # quick counts
+
+# Add gene names for easier interpretation
+gene_map <- df %>% select(gene = gene_id, gene_name)
+short_relaxed <- short_relaxed %>% left_join(gene_map, by="gene") %>%
+  relocate(gene_name, .after = gene)
+
+nrow(short_strict); nrow(short_relaxed)
+head(short_relaxed, 10)
+```
+
+Under the strict consensus, no genes are found, which is not surprising given the earlier results.
+
+So we take the approach of relaxing the criteria, and use each other as a check.
+
+We require that both methods agree on the direction of change, and use a Fisher combined p-value with a more lenient FDR threshold of 10%. We also lower the fold-change requirement to 1.5x (log2FC of 0.58).
+
+This 'relaxed' consensus finds 25 significant genes, which is a more reasonable number to work with, we can output these as potential targets for Task 2, and the CRISPR interventions (CRISPRa for down in COVID, CRISPRi for up). If we can find safe guides to targets these genes specifically, we can look at the impact of increasing and decreasing their expressions respectively.
+
+### Check with Leave One Out (LOO)
+
+To confirm the robustness of our findings, we can perform a Leave One Out analysis, where we repeat the DE analysis multiple times, each time leaving out one sample. This helps to ensure that our results are not overly dependent on any single sample.
+
+It's potentially overkill for this small dataset, but useful as a safeguard.
+
+```{r loo-analysis, echo=FALSE}
+drop <- sw$sample[1]  # weakest by weight
+keep_samp <- samples$sample != drop
+cts_loo <- cts[, keep_samp]; samp_loo <- samples[keep_samp, ]
+des_loo <- model.matrix(~ subject + treatment, data = samp_loo)
+
+v_loo  <- limma::voomWithQualityWeights(cts_loo, des_loo, plot=FALSE)
+fit_loo <- limma::eBayes(limma::lmFit(v_loo, des_loo), robust=TRUE, trend=TRUE)
+tt_loo  <- limma::topTreat(fit_loo, coef="treatmentSARS", lfc=0.58, number=Inf) %>%
+  tibble::rownames_to_column("gene") %>%
+  transmute(gene, logFC_limma=logFC, p_limma=P.Value, FDR_limma=adj.P.Val)
+
+dge_loo <- edgeR::DGEList(cts_loo) |> edgeR::calcNormFactors("TMM")
+dge_loo <- edgeR::estimateDisp(dge_loo, des_loo, robust=TRUE)
+qlf_loo <- edgeR::glmQLFit(dge_loo, des_loo, robust=TRUE)
+ed_loo  <- edgeR::topTags(edgeR::glmTreat(qlf_loo, coef=match("treatmentSARS", colnames(des_loo)), lfc=0.58), n=Inf)$table %>%
+  tibble::rownames_to_column("gene") %>%
+  transmute(gene, logFC_edgeR=logFC, p_edgeR=PValue, FDR_edgeR=FDR)
+
+cons_loo <- inner_join(tt_loo, ed_loo, by="gene") %>%
+  mutate(agree_dir = sign(logFC_limma)==sign(logFC_edgeR),
+         p_fisher = pchisq(-2*(log(p_limma)+log(p_edgeR)), df=4, lower.tail=FALSE),
+         FDR_fisher = p.adjust(p_fisher, "BH"),
+         mean_logFC = (logFC_limma + logFC_edgeR)/2)
+
+robust_hits <- intersect(
+  short_relaxed$gene,
+  cons_loo %>% filter(agree_dir, FDR_fisher < 0.10, abs(mean_logFC) >= 0.58) %>% pull(gene)
+)
+length(robust_hits)
+robust_hits
+```
+
+LOO confirms that there are 25 robust hits in the relaxed set, which is a good sign. These genes are likely to be truly differentially expressed due to the treatment, rather than being artifacts of individual sample variability.
+
+In essence this gives us some confidence in our findings, and helps to reassure that the genes noted earlier as noisier are not driving the results.
+
+### BH Diagnostics
+
+Finally we confirm the FDR control via Benjamini-Hochberg (BH) diagnostics. This is a useful sanity-check to ensure that our p-values and FDR adjustments are behaving as expected.
+
+If our values are off base, then the robustness checks are moot.
+
+BH asks "is the p-value small enough, given its rank among all p-values, to be called significant at the chosen FDR level q?"
+
+The plots and summaries below confirm that while Limma-treats p values aren't great, the Fisher-combined p-values are good enough for the first 5-6 ranks. The relaxed hits at 5-10% FDR then are reasonable, and we can trust them. 
+
+```{r bh-explore, echo=FALSE}
+bh_report <- function(p, q = c(0.05, 0.10), top = 15, label = "p-values") {
+  p <- p[is.finite(p) & !is.na(p)]
+  m <- length(p); stopifnot(m > 0)
+
+  p_sorted <- sort(p)
+  k <- seq_len(m); x <- k / m
+
+  # Build a tidy table of cutoffs and pass/fail
+  df <- tibble(rank = k, x = x, p_sorted = p_sorted)
+  for (qq in q) {
+    df[[paste0("cutoff_q", sprintf("%02d", qq*100))]] <- x * qq
+    df[[paste0("pass_q",   sprintf("%02d", qq*100))]] <- p_sorted <= x * qq
+  }
+
+  # Critical k* and #discoveries via BH (also sanity-check with p.adjust)
+  k_star <- sapply(q, function(qq) max(c(0, which(p_sorted <= x * qq))))
+  names(k_star) <- paste0("q", sprintf("%02d", q*100))
+  disc_adj <- sapply(q, function(qq) sum(p.adjust(p_sorted, "BH") < qq))
+  names(disc_adj) <- paste0("adj<", sprintf("%02d", q*100))
+
+  # Plot: sorted p with exact BH curves (computed, not abline) on log-y
+  cut_long <- df %>%
+    select(rank, x, starts_with("cutoff_q")) %>%
+    pivot_longer(starts_with("cutoff_q"),
+                 names_to = "q", values_to = "cutoff") %>%
+    mutate(q = gsub("cutoff_q", "q = ", q))
+
+  g <- ggplot(df, aes(x = x, y = p_sorted)) +
+    geom_point(size = 0.6, alpha = 0.6) +
+    geom_line(data = cut_long, aes(y = cutoff, linetype = q), linewidth = 0.6) +
+    scale_y_log10() +
+    labs(
+      title = "BH step-up: sorted p vs BH cutoffs",
+      subtitle = paste0("m = ", m, "  |  ", label),
+      x = "rank / m", y = "sorted p-value (log10)"
+    ) +
+    theme_minimal()
+
+  list(
+    top_table = head(df, top),
+    k_star = k_star,
+    n_discoveries = disc_adj,
+    m = m,
+    plot = g
+  )
+}
+```
+
+``` {r bh-limma, echo=FALSE}
+bh_limma <- bh_report(tt_limma$p_limma, q = c(0.05, 0.10),
+                      top = 15, label = "limma-treat (lfc ≥ 1)")
+bh_limma$top_table
+bh_limma$k_star
+bh_limma$n_discoveries
+bh_limma$plot
+```
+
+``` {r bh-fisher, echo=FALSE}
+bh_fisher <- bh_report(consensus$p_fisher, q = c(0.05, 0.10),
+                       top = 15, label = "Fisher-combined (limma+edgeR)")
+bh_fisher$top_table
+bh_fisher$k_star
+bh_fisher$n_discoveries
+bh_fisher$plot
+```
+
+
+``` {r bh-headline, echo=FALSE}
+cat(sprintf("BH critical ranks — limma-treat: q=0.05→%d, q=0.10→%d; discoveries via p.adjust: %s\n",
+            bh_limma$k_star["q05"], bh_limma$k_star["q10"],
+            paste(names(bh_limma$n_discoveries), bh_limma$n_discoveries, collapse=", ")))
+
+cat(sprintf("BH critical ranks — Fisher: q=0.05→%d, q=0.10→%d; discoveries via p.adjust: %s\n",
+            bh_fisher$k_star["q05"], bh_fisher$k_star["q10"],
+            paste(names(bh_fisher$n_discoveries), bh_fisher$n_discoveries, collapse=", ")))
+```
+
+
+
+## Export Results (for Re-Use in later tasks)
+
+With the results confirmed, we can export the relevant tables for use in later tasks. 
+
+```{r export-results, echo=FALSE}
+readr::write_csv(tt_limma,      "DE_limma_treat_SARS_vs_mock.csv")
+readr::write_csv(edgeR_res,     "DE_edgeR_treat_SARS_vs_mock.csv")
+readr::write_csv(consensus,     "DE_consensus_limmaTreat_edgeR_treat.csv")
+readr::write_csv(short_strict,  "CRISPR_target_shortlist_STRICT.csv")
+readr::write_csv(short_relaxed, "CRISPR_target_shortlist_RELAXED_perDonor.csv")
+```
+
+
+<details style="margin-bottom:10px;">
+<summary>Standard output and standard error</summary>
+`C:/Users/Axis3/Github Repos/UniWork/IFN646/Project/Task 1/Task_1 v2_reprex_std_out_err.txt`
+</details>
+
+<details style="margin-bottom:10px;">
+<summary>Session info</summary>
+```{r }
+sessionInfo()
+```
+</details>

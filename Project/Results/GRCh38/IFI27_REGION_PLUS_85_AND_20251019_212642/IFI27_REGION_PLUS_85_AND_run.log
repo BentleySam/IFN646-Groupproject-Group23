@@ -1,0 +1,30 @@
++ command -v dos2unix
++ dos2unix -q /home/axis/crackling_inputs/IFI27_region_plus_exons.fa
++ BOWTIE_PREFIX_PATH=/home/axis/genomes/GRCh38
++ [[ -f /home/axis/genomes/GRCh38.issl ]]
+++ abspath /home/axis/genomes//home/axis/genomes/GRCh38.issl
+++ python3 - /home/axis/genomes//home/axis/genomes/GRCh38.issl
++ ISSL_PATH=/home/axis/genomes/home/axis/genomes/GRCh38.issl
++ have_bt2=true
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/GRCh38.1.bt2 ]]
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/GRCh38.2.bt2 ]]
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/GRCh38.3.bt2 ]]
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/GRCh38.4.bt2 ]]
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/GRCh38.rev.1.bt2 ]]
++ for sfx in 1 2 3 4 "rev.1" "rev.2"
++ [[ -s /home/axis/genomes/GRCh38.rev.2.bt2 ]]
++ have_issl=true
++ [[ -s /home/axis/genomes/home/axis/genomes/GRCh38.issl ]]
++ have_issl=false
++ true
++ false
++ [[ -n '' ]]
++ die 'Indices missing. Provide --ref-fasta to build.'
++ echo 'ERROR: Indices missing. Provide --ref-fasta to build.'
+ERROR: Indices missing. Provide --ref-fasta to build.
++ exit 2

@@ -17,10 +17,10 @@
 
 
 set -euo pipefail
-log(){ printf '[%s] %s\n' "$(date +%F' '%T)" "$*" >&2; }
-warn(){ printf '[%s] WARN: %s\n' "$(date +%F' '%T)" "$*" >&2; }
-die(){ printf '[%s] ERROR: %s\n' "$(date +%F' '%T)" "$*" >&2; exit 1; }
-run(){ log "$*"; "$@"; }
+log()  { local ts; ts="$(date +%F' '%T)"; printf '[%s] %s\n' "$ts" "$*" | tee -a "${LOGFILE:-/dev/null}" >&2; }
+warn() { local ts; ts="$(date +%F' '%T)"; printf '[%s] WARN: %s\n' "$ts" "$*" | tee -a "${LOGFILE:-/dev/null}" >&2; }
+die()  { local ts; ts="$(date +%F' '%T)"; printf '[%s] ERROR: %s\n' "$ts" "$*" | tee -a "${LOGFILE:-/dev/null}" >&2; exit 1; }
+run()  { log "$*"; "$@"; }
 
 # --- arg parse (overrides env defaults below) ---
 VCFDIR="${VCFDIR:-}"
@@ -38,6 +38,104 @@ TMP_ROOT="${TMP_ROOT:-}" # if empty, will use "$OUT/.tmp"
 ISSL_THREADS="${ISSL_THREADS:-2}"
 ISSL_MAX_OPEN_FILES="${ISSL_MAX_OPEN_FILES:-}" # default computed from ulimit
 ISSL_RETRIES="${ISSL_RETRIES:-3}"
+
+# --- contig utilities ---
+ref_contigs_file() {
+  # writes sorted unique REF contigs to stdout (requires .fai)
+  local fai="${REF}.fai"
+  [[ -s "$fai" ]] || run samtools faidx "$REF"
+  cut -f1 "$fai" | sort -u
+}
+
+vcf_contigs_used() {          # CHROM values actually used (data lines)
+  # $1 = vcf.gz
+  bcftools view -H "$1" | cut -f1 | sort -u
+}
+
+vcf_contigs_header() {        # declared contigs in the header
+  # $1 = vcf.gz
+  bcftools view -h "$1" | awk -F'[=,>]' '/^##contig=/{print $3}' | sort -u
+}
+
+vcf_idxstats() {              # bcftools idxstats counts
+  # $1 = vcf.gz
+  bcftools idxstats "$1" | awk 'BEGIN{OFS="\t"} {print $1,$3}'
+}
+
+tabix_list() {                # sequences in the tabix index
+  # $1 = vcf.gz
+  tabix -l "$1" | sort -u
+}
+
+write_list() {                # util: write lines to file safely
+  # $1 = path
+  # stdin = content
+  local f="$1"
+  cat > "$f"
+}
+
+compare_lists() {
+  # $1 list A, $2 list B
+  # prints: INTERSECT/MISSING_A/MISSING_B sections
+  local A="$1" B="$2"
+  local tmpA tmpB
+  tmpA="$(mktemp)"; tmpB="$(mktemp)"
+  sort -u "$A" > "$tmpA"; sort -u "$B" > "$tmpB"
+  printf "INTERSECT:\n"
+  comm -12 "$tmpA" "$tmpB"
+  printf "\nMISSING_IN_REF (present_in_VCF_not_in_REF):\n"
+  comm -23 "$tmpA" "$tmpB"
+  printf "\nMISSING_IN_VCF (present_in_REF_not_in_VCF):\n"
+  comm -13 "$tmpA" "$tmpB"
+  rm -f "$tmpA" "$tmpB"
+}
+
+contig_checks() {
+  # $1 = vcf.gz ; $2 = stage tag (raw|renamed|norm)
+  local vcf="$1" stage="$2" stem="$REPORT_DIR/${SAMPLE}.${stage}"
+
+  # ensure index (needed for idxstats / tabix -l)
+  [[ -s "${vcf}.tbi" || -s "${vcf}.csi" ]] || run tabix -p vcf "$vcf"
+
+  # files we write
+  local used="${stem}.contigs.used.txt"
+  local hdr="${stem}.contigs.header.txt"
+  local tbi="${stem}.tabix_list.txt"
+  local idx="${stem}.idxstats.tsv"
+  local ref="${REPORT_DIR}/${SAMPLE}.ref.contigs.txt"
+  local cmp="${stem}.contig_compare.txt"
+
+  # collect
+  vcf_contigs_used   "$vcf" | write_list "$used"
+  vcf_contigs_header "$vcf" | write_list "$hdr"
+  tabix_list         "$vcf" | write_list "$tbi"
+  vcf_idxstats       "$vcf" | write_list "$idx"
+  # ref contigs (write once per sample)
+  [[ -s "$ref" ]] || ref_contigs_file > "$ref"
+
+  # compare "used" vs reference contigs
+  compare_lists "$used" "$ref" > "$cmp"
+
+  # summarise counts into global TSV (variants per contig)
+  # idxstats is contig \t n_records
+  awk -v s="$SAMPLE" -v st="$stage" 'BEGIN{OFS="\t"} {print s,st,$1,$2}' "$idx" >> "$SUMMARY_TSV"
+
+  # log highlights
+  local n_used n_hdr n_tbi n_idx n_overlap n_missing_ref
+  n_used=$(wc -l < "$used" 2>/dev/null || echo 0)
+  n_hdr=$(wc -l < "$hdr"  2>/dev/null || echo 0)
+  n_tbi=$(wc -l < "$tbi"  2>/dev/null || echo 0)
+  n_idx=$(wc -l < "$idx"  2>/dev/null || echo 0)
+  n_overlap=$(awk '/^INTERSECT:/{p=1;next} /^$/{next} /^MISSING_/{p=0} p{c++} END{print c+0}' "$cmp")
+  n_missing_ref=$(awk '/^MISSING_IN_REF/{p=1;next} /^$/{next} /^MISSING_IN_VCF/{p=0} p{c++} END{print c+0}' "$cmp")
+
+  log "VCF[$stage]: used=${n_used}, header=${n_hdr}, tabix=${n_tbi}, idxstats_rows=${n_idx}, overlap_with_REF=${n_overlap}, missing_in_REF=${n_missing_ref}"
+  if (( n_overlap == 0 && n_used > 0 )); then
+    warn "No contig name overlap with REF at stage=${stage}. Check naming (e.g., chr1 vs 1 vs NC_*). See: $cmp"
+  elif (( n_missing_ref > 0 )); then
+    warn "Some VCF contigs not in REF at stage=${stage}. See details: $cmp"
+  fi
+}
 
 sanitize_fa() {
   # $1=in fasta, $2=out fasta
@@ -102,6 +200,25 @@ while [[ $# -gt 0 ]]; do
 done
 [[ -n "${VCFDIR:-}" && -n "${REF:-}" && -n "${OUT:-}" ]] || usage
 
+# --- OUT sanity + normalise + report/log dirs (must be after arg parsing) ---
+: "${OUT:?--out was empty; pass a real path}"
+
+# Make OUT absolute (best effort)
+OUT="$(readlink -m "$OUT" 2>/dev/null || realpath -m "$OUT" 2>/dev/null || printf "%s" "$OUT")"
+OUT_PARENT="$(dirname "$OUT")"
+[[ -d "$OUT_PARENT" && -w "$OUT_PARENT" ]] || die "Parent dir not writable: $OUT_PARENT"
+
+mkdir -p "$OUT" || die "Could not create OUT: $OUT"
+
+REPORT_DIR="${OUT%/}/reports"
+LOG_DIR="${OUT%/}/logs"
+mkdir -p "$REPORT_DIR" "$LOG_DIR" || die "Could not create $REPORT_DIR / $LOG_DIR"
+
+SUMMARY_TSV="$REPORT_DIR/contig_summary.tsv"
+[[ -s "$SUMMARY_TSV" ]] || printf "sample\tstage\tcontig\tvariants\n" > "$SUMMARY_TSV"
+
+write_versions_report
+
 mapfile -t VCF_FILES < <(find "$VCFDIR" -maxdepth 1 -type f \( -name '*.vcf' -o -name '*.vcf.gz' \) | sort)
 (( ${#VCF_FILES[@]} > 0 )) || die "No VCFs found in: $VCFDIR"
 log "Found ${#VCF_FILES[@]} VCF file(s) in $VCFDIR"
@@ -143,11 +260,94 @@ fi
 ISSL_THREADS="${ISSL_THREADS:-2}"
 log "Capping ISSL open files to ${ISSL_MAX_OPEN_FILES}; ISSL threads = ${ISSL_THREADS}"
 
+# --- version helpers ---
+version_of() {
+  # Prints: "<name>\t<version or status>"
+  # Tries common flags; falls back to -h first line.
+  local name="$1"
+  local path; path="$(command -v "$name" 2>/dev/null || true)"
+  if [[ -z "$path" ]]; then
+    printf "%s\tNOT FOUND\n" "$name"
+    return 0
+  fi
+  local ver=""
+  ver="$("$name" --version 2>&1 | head -n1 || true)"
+  [[ -n "$ver" ]] || ver="$("$name" -version 2>&1 | head -n1 || true)"
+  [[ -n "$ver" ]] || ver="$("$name" -V 2>&1 | head -n1 || true)"
+  [[ -n "$ver" ]] || ver="$("$name" -h 2>&1 | head -n1 || true)"
+  printf "%s\t%s\n" "$name" "${ver:-unknown}"
+}
+write_versions_report() {
+  # Writes tool versions to OUT/reports/tool_versions.txt and logs it.
+  local out="$REPORT_DIR/tool_versions.txt"
+  : > "$out"
+
+  {
+    echo "# Tool versions"
+    printf "generated_at\t%s\n" "$(date -Is)"
+    printf "host\t%s\n" "$(uname -a 2>/dev/null || echo unknown)"
+    if command -v lsb_release >/dev/null 2>&1; then
+      printf "distro\t%s\n" "$(lsb_release -ds)"
+    fi
+    echo
+
+    # Core tools
+    version_of bash
+    version_of awk
+    version_of bcftools
+    version_of samtools
+    version_of bgzip
+    version_of tabix
+
+    # Optional indexers (only if present/used)
+    if [[ "$BUILD_INDEX" == 1 ]]; then
+      version_of bowtie2-build
+      version_of extractOfftargets
+    fi
+
+    # ISSL creator (if detected)
+    if [[ -n "$CREATE_ISSL" ]]; then
+      # $CREATE_ISSL may be 'createIsslIndex' or 'isslCreateIndex'
+      local n; n="$(basename "$CREATE_ISSL")"
+      # Try dedicated flags then help
+      local v
+      v="$("$CREATE_ISSL" --version 2>&1 | head -n1 || true)"
+      [[ -n "$v" ]] || v="$("$CREATE_ISSL" -version 2>&1 | head -n1 || true)"
+      [[ -n "$v" ]] || v="$("$CREATE_ISSL" -h 2>&1 | head -n1 || true)"
+      printf "%s\t%s\n" "$n" "${v:-unknown}"
+    fi
+
+    echo
+    echo "# Inputs"
+    printf "REF\t%s\n" "$REF"
+    if [[ -s "${REF}.fai" || -s "$REF" ]]; then
+      # Include a quick checksum for reproducibility if available
+      if command -v sha256sum >/dev/null 2>&1; then
+        printf "REF_sha256\t%s\n" "$(sha256sum "$REF" | awk '{print $1}')"
+      fi
+      if [[ -s "${REF}.fai" ]]; then
+        printf "REF_n_contigs\t%s\n" "$(cut -f1 "${REF}.fai" | wc -l)"
+      fi
+    fi
+    if [[ -n "${CHRMAP:-}" ]]; then
+      printf "CHRMAP\t%s\n" "$CHRMAP"
+      if command -v sha256sum >/dev/null 2>&1 && [[ -f "$CHRMAP" ]]; then
+        printf "CHRMAP_sha256\t%s\n" "$(sha256sum "$CHRMAP" | awk '{print $1}')"
+      fi
+    fi
+  } | tee -a "$out" | while IFS= read -r line; do log "$line"; done
+}
 
 for VCF in "${VCF_FILES[@]}"; do
   BASENAME=$(basename "$VCF")
   SAMPLE=${BASENAME%.vcf.gz}
   SAMPLE=${SAMPLE%.vcf}
+
+  LOGFILE="$LOG_DIR/${SAMPLE}.log"
+  log "==== Begin ${SAMPLE} ===="
+  if [[ -s "$REPORT_DIR/tool_versions.txt" ]]; then
+    while IFS= read -r line; do log "$line"; done < "$REPORT_DIR/tool_versions.txt"
+  fi
 
   # ----- Step 0: Ensure we have a bgzipped, indexed VCF -----
   if [[ "$VCF" =~ \.vcf$ ]]; then
@@ -164,6 +364,8 @@ for VCF in "${VCF_FILES[@]}"; do
     log "Skip bgzip/tabix: $GZ exists"
   fi
   VCF="$GZ"
+  contig_checks "$VCF" "raw"
+
 
   # ----- Step 1: Optional contig rename to match the FASTA -----
   if [[ -n "${CHRMAP:-}" ]]; then
@@ -175,6 +377,8 @@ for VCF in "${VCF_FILES[@]}"; do
       log "Skip rename: $REN exists"
     fi
     VCF="$REN"
+    contig_checks "$VCF" "renamed"
+
   fi
 
   # ----- Step 2: Normalize/sort/index -----
@@ -186,6 +390,7 @@ for VCF in "${VCF_FILES[@]}"; do
   else
     log "Skip norm/sort: $NORM exists"
   fi
+  contig_checks "$NORM" "norm"
 
   # ----- Step 3: Build consensus FASTA(s) -----
   case "$HAPLOTYPES" in
@@ -253,7 +458,7 @@ for VCF in "${VCF_FILES[@]}"; do
                 else
                 # Flag-args build
                 run "$CREATE_ISSL" -t "$OFF" -l "$GUIDE_LEN" -w "$SLICE_WIDTH" -o "$ISSL_OUT"
-                fi
+            fi
   )
 else
   log "Skip ISSL${H:+ (H$H)}: $ISSL_OUT exists"
@@ -262,6 +467,7 @@ fi
         fi
       done
       log "Finished ${SAMPLE} (both haplotypes)"
+      log "==== End ${SAMPLE} ===="
       continue
       ;;
 
@@ -320,4 +526,5 @@ fi
   fi
 
   log "Finished ${SAMPLE}"
+  log "==== End ${SAMPLE} ===="
 done
